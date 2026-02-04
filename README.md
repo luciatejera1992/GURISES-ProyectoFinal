@@ -1,7 +1,5 @@
 # GURISES - Proyecto Final
 
-![Logo del Proyecto](logo.png)
-
 ## Objetivo General
 El proyecto **GURISES** tiene como objetivo analizar los factores que inciden en el desarrollo infantil y adolescente, alineándose con los principios de la pedagogía Montessori. A través del análisis de datos, la creación de índices sintéticos y la cuantificación de estos índices, se busca comprender y evaluar el desajuste educativo y su relación con el desarrollo integral de niños y adolescentes.
 
