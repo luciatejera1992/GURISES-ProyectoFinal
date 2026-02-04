@@ -1,9 +1,37 @@
 # GURISES - Proyecto Final
 
-## Objetivo General
-El proyecto **GURISES** tiene como objetivo analizar los factores que inciden en el desarrollo infantil y adolescente, alineándose con los principios de la pedagogía Montessori. A través del análisis de datos, la creación de índices sintéticos y la cuantificación de estos índices, se busca comprender y evaluar el desajuste educativo y su relación con el desarrollo integral de niños y adolescentes.
+## Objetivo general
+Gurises es un proyecto de análisis de datos aplicado a la educación infantil y adolescente, cuyo objetivo principal es comprender y acompañar el desarrollo de niñ@s y adolescentes desde una mirada integral, respetuosa y basada en la pedagogía Montessori.
 
-## Contenido del Repositorio
+El proyecto nace de una convicción clara:
+los datos y la tecnología pueden ser herramientas valiosas para la educación solo si se utilizan con responsabilidad, sensibilidad pedagógica y respeto por los procesos naturales del desarrollo humano.
+
+En lugar de centrarse exclusivamente en el rendimiento académico o en resultados numéricos, Gurises pone el foco en la relación entre el niño, su entorno, su autonomía y su bienestar, entendiendo que el aprendizaje genuino surge cuando estas dimensiones se encuentran en equilibrio.
+
+
+## Qué hace el proyecto 
+
+El proyecto integra distintas etapas y herramientas:
+
+Análisis de datasets educativos reales, relacionados con hábitos de estudio, entorno, bienestar y uso de tecnología.
+
+Construcción de índices pedagógicos que sintetizan dimensiones clave del desarrollo:
+
+Entorno educativo
+
+Autonomía y autorregulación
+
+Bienestar
+
+Equilibrio digital
+
+Análisis exploratorio y visualización de datos en Power BI, para mostrar de forma transparente y comprensible los patrones presentes en los datos.
+
+Modelado con machine learning, utilizado de forma ética para identificar posibles señales de desajuste entre dimensiones, siempre contextualizadas pedagógicamente.
+
+Desarrollo de una aplicación en Streamlit, orientada a familias, educadores e instituciones, que traduce los resultados técnicos en mensajes claros, accesibles y alineados con la pedagogía Montessori.
+
+## Contenido del repositorio
 
 - **`app.py`**: Archivo principal para la ejecución del proyecto.
 - **`powerbi_dataset.csv` y `powerbi_dataset.xlsx`**: Conjuntos de datos utilizados para análisis y visualización.
