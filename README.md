@@ -88,7 +88,12 @@ El proyecto utiliza técnicas de análisis de datos y aprendizaje automático pa
 
 Incluye dashboards interactivos creados con Power BI para explorar los datos y resultados de manera intuitiva.
 
+## Acceso al Panel de Power BI
 
+Puedes acceder al dashboard interactivo de Power BI haciendo clic en el siguiente botón:
+
+![Abrir Panel de Power BI]
+https://app.powerbi.com/groups/me/reports/d113795a-6f16-4f96-9f8c-31c344a3c925/3b85740245d2d995ceba?experience=power-bi
 
 ## Contacto
 
