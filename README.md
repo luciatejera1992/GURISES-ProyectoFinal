@@ -64,12 +64,12 @@ Incluye dashboards interactivos creados con Power BI para explorar los datos y r
 
 ## Contacto
 
-Para preguntas o sugerencias, por favor contacta a:
+Para preguntas o sugerencias:
 - **Nombre**: Lucía Tejera
 - **Email**: luciatejera1992@gmail.com
 
 ---
 
-¡Gracias por visitar este repositorio! 😊
+😊
 
 
