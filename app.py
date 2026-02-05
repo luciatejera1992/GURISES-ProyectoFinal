@@ -521,7 +521,7 @@ with tab_eval:
     with st.form("formulario_evaluacion"):
 
         # ----- 1. ENTORNO PREPARADO (ISEE) -----
-        st.subheader("1. Entorno preparado (ISEE)")
+        st.subheader("Índice de Soporte del Entorno Educativo (ISEE)")
         st.markdown("""
         <div class="montessori-box">
         <p>
@@ -559,7 +559,7 @@ with tab_eval:
         st.divider()
 
         # ----- 2. AUTONOMÍA Y AUTODISCIPLINA (IAA) -----
-        st.subheader("2. Autonomía y autodisciplina (IAA)")
+        st.subheader("Índice de Autonomía y Autodisciplina (IAA)")
         st.markdown("""
         <div class="montessori-box">
         <p>
@@ -596,7 +596,7 @@ with tab_eval:
         st.divider()
 
         # ----- 3. BIENESTAR Y EQUILIBRIO (IBE) -----
-        st.subheader("3. Bienestar y equilibrio (IBE)")
+        st.subheader("Índice de Bienestar y Equilibrio (IBE)")
         st.markdown("""
         <div class="montessori-box">
         <p>
@@ -632,7 +632,7 @@ with tab_eval:
         st.divider()
 
         # ----- 4. ENTORNO DIGITAL (IED) -----
-        st.subheader("4. Entorno digital (IED)")
+        st.subheader("Índice de Entorno Digital (IED)")
         st.markdown("""
         <div class="montessori-box">
         <p>
