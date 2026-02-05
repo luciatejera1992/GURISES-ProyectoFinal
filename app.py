@@ -56,7 +56,7 @@ st.markdown("""
 }
 
 p, li, label, span {
-    font-size: 16px;
+    font-size: 34px;
     line-height: 1.6;
 }
 
@@ -409,7 +409,7 @@ with col_logo:
     st.image(logo, width=100)
 with col_title:
     st.markdown(
-        "<h1 style='margin-bottom:0;color:#4763a2;'>GURISES</h1>"
+        "<h2 style='margin-bottom:0;color:#4763a2;'>GURISES</h2>"
         "<p style='margin-top:0;color:#555;font-size:1.1em;'>"
         "Un Caracol Montessori — Herramienta de lectura pedagógica</p>",
         unsafe_allow_html=True,
@@ -798,10 +798,8 @@ with tab_eval:
 with tab_datos:
     st.markdown("")
 
-    sub_rend, sub_screen = st.tabs([
-        "Rendimiento estudiantil",
-        "Tiempo de pantalla",
-    ])
+    sub_rend, = st.tabs([
+        "Rendimiento estudiantil"])
 
     # --- Subpestaña: Rendimiento estudiantil ---
     with sub_rend:
@@ -849,107 +847,6 @@ with tab_datos:
         )
         fig_corr.update_layout(height=400)
         st.plotly_chart(fig_corr, use_container_width=True)
-
-        st.divider()
-
-        # --- Boxplots con datos originales ---
-        st.subheader("Variables del dataset original")
-
-        df_box = cargar_datos_rendimiento()
-        # Limpieza para Teacher_Quality y School_Type
-        for col in ["Teacher_Quality", "Parental_Education_Level"]:
-            if col in df_box.columns and df_box[col].isnull().any():
-                df_box[col] = df_box[col].fillna(df_box[col].mode()[0])
-
-        box_col1, box_col2 = st.columns(2)
-
-        with box_col1:
-            fig_tq = px.box(
-                df_box,
-                x="Teacher_Quality",
-                y="Exam_Score",
-                color="Teacher_Quality",
-                color_discrete_sequence=PLOTLY_COLORS,
-                title="Exam Score por Teacher Quality",
-                category_orders={"Teacher_Quality": ["Low", "Medium", "High"]},
-            )
-            fig_tq.update_layout(showlegend=False, height=400)
-            st.plotly_chart(fig_tq, use_container_width=True)
-
-        with box_col2:
-            fig_st = px.box(
-                df_box,
-                x="School_Type",
-                y="Exam_Score",
-                color="School_Type",
-                color_discrete_sequence=PLOTLY_COLORS,
-                title="Exam Score por School Type",
-            )
-            fig_st.update_layout(showlegend=False, height=400)
-            st.plotly_chart(fig_st, use_container_width=True)
-
-        st.divider()
-
-        # --- Scatter Hours_Studied vs Exam_Score ---
-        st.subheader("Hours Studied vs Exam Score")
-        fig_scatter = px.scatter(
-            df_box,
-            x="Hours_Studied",
-            y="Exam_Score",
-            opacity=0.3,
-            color_discrete_sequence=[COLOR_NAVY],
-            title="Relación entre horas de estudio y calificación",
-        )
-        fig_scatter.update_layout(height=400)
-        st.plotly_chart(fig_scatter, use_container_width=True)
-
-    # --- Subpestaña: Tiempo de pantalla ---
-    with sub_screen:
-        df_screen = cargar_datos_pantalla()
-
-        st.subheader("IED por grupo etario")
-        df_ied = cargar_ied_por_grupo()
-        fig_ied = px.bar(
-            df_ied,
-            x="Age_Group",
-            y="IED",
-            color="Age_Group",
-            color_discrete_sequence=[COLOR_NAVY, COLOR_GOLD],
-            title="Índice de Entorno Digital por grupo etario",
-            text_auto=".2f",
-        )
-        fig_ied.update_layout(showlegend=False, height=400, yaxis_range=[0, 1])
-        st.plotly_chart(fig_ied, use_container_width=True)
-
-        st.divider()
-
-        # --- Boxplot por tipo de día ---
-        st.subheader("Tiempo de pantalla por tipo de día")
-        fig_day = px.box(
-            df_screen,
-            x="Day Type",
-            y="Average Screen Time (hours)",
-            color="Day Type",
-            color_discrete_sequence=[COLOR_NAVY, COLOR_GOLD],
-            title="Distribución del tiempo de pantalla: Weekday vs Weekend",
-        )
-        fig_day.update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig_day, use_container_width=True)
-
-        st.divider()
-
-        # --- Distribución por tipo de pantalla ---
-        st.subheader("Tiempo de pantalla por tipo de uso")
-        fig_type = px.box(
-            df_screen,
-            x="Screen Time Type",
-            y="Average Screen Time (hours)",
-            color="Screen Time Type",
-            color_discrete_sequence=PLOTLY_COLORS[:3],
-            title="Educational vs Recreational vs Total",
-        )
-        fig_type.update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig_type, use_container_width=True)
 
 
 # =============================================================
