@@ -1,23 +1,28 @@
+# ============================================
+# IMPORTACIONES
+# ============================================
+
+# Framework de la app
 import streamlit as st
+
+# Manipulación de datos
 import pandas as pd
 import numpy as np
-import pickle
-from pathlib import Path
-from PIL import Image
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.metrics import classification_report, silhouette_score
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
+
+# Visualización
 import plotly.express as px
 import plotly.graph_objects as go
 
-# =========================================================
-# CONSTANTES
-# =========================================================
-THRESHOLD_PEDAGOGICO = 0.65
-THRESHOLD_CONDICION_BASE = 0.25
-SENSIBILIDAD_IED = 0.3
+# Preprocesamiento (solo para clustering no supervisado)
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.cluster import KMeans
+
+# Gestión de archivos y rutas
+from pathlib import Path
+
+# Imágenes (logo / marca)
+from PIL import Image
+
 
 # =========================================================
 # CONFIGURACIÓN GENERAL
@@ -28,113 +33,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
-<style>
 
-/* ================= BASE ================= */
-.stApp {
-    background-color: #ffffff;
-}
+# ============================================
+# UMBRALES PEDAGÓGICOS (REFERENCIAS ORIENTATIVAS)
+# ============================================
 
-/* ================= TIPOGRAFÍA ================= */
-[data-testid="stTitle"] h1 {
-    color: #4763a2 !important;
-    font-weight: 700 !important;
-    margin-bottom: 0.2em;
-}
+THRESHOLD_PEDAGOGICO = 0.65
+# Punto de atención pedagógica.
+# Indica necesidad de observación más cuidadosa.
+# No constituye diagnóstico ni clasificación.
 
-[data-testid="stHeader"] h2 {
-    color: #4763a2 !important;
-    font-weight: 700 !important;
-    margin-top: 1.6em;
-}
-
-[data-testid="stSubheader"] h3 {
-    color: #c48a0e !important;
-    font-weight: 600 !important;
-    margin-bottom: 0.6em;
-}
-
-p, li, label, span {
-    font-size: 34px;
-    line-height: 1.6;
-}
-
-/* ================= CAJAS MONTESSORI ================= */
-.montessori-box {
-    background-color: #f9fafc;
-    border-left: 6px solid #c48a0e;
-    padding: 1.6em;
-    border-radius: 14px;
-    margin-bottom: 1.6em;
-}
-
-/* ================= TARJETAS MÉTRICAS ================= */
-.metric-card {
-    background-color: #f9fafc;
-    border-radius: 14px;
-    padding: 1.4em;
-    text-align: center;
-    border: 1px solid #e0e4ed;
-}
-
-.metric-card h2 {
-    color: #4763a2 !important;
-    font-size: 2.2em;
-    margin: 0;
-    font-weight: 700;
-}
-
-.metric-card p {
-    color: #555;
-    font-size: 0.95em;
-    margin: 0.3em 0 0 0;
-}
-
-/* ================= INPUTS ================= */
-.montessori-box input,
-.montessori-box select,
-.montessori-box textarea {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    border-radius: 10px !important;
-}
-
-.montessori-box [data-testid="stNumberInput"],
-.montessori-box [data-testid="stSelectbox"],
-.montessori-box [data-testid="stSlider"],
-.montessori-box [data-testid="stTextInput"] {
-    background-color: #ffffff !important;
-    border-radius: 10px;
-    padding: 0.4em;
-}
-
-/* ================= BOTÓN ================= */
-.stButton > button {
-    background-color: #4763a2 !important;
-    color: white !important;
-    border-radius: 14px;
-    padding: 0.7em 1.8em;
-    font-weight: 600;
-    border: none;
-}
-
-.stButton > button:hover {
-    background-color: #36508c !important;
-}
-
-/* ================= TABS ================= */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-}
-
-.stTabs [data-baseweb="tab"] {
-    padding: 10px 24px;
-    font-weight: 600;
-}
-
-</style>
-""", unsafe_allow_html=True)
+THRESHOLD_CONDICION_BASE = 0.25
+# Umbral mínimo de condición de base (bienestar).
+# Si no se alcanza, se prioriza el acompañamiento
+# antes de interpretar cualquier perfil educativo.
 
 
 # =========================================================
@@ -142,165 +54,156 @@ p, li, label, span {
 # =========================================================
 BASE_DIR = Path(__file__).parent
 
-# =========================================================
-# PALETA DE COLORES
-# =========================================================
-COLOR_NAVY = "#4763a2"
-COLOR_GOLD = "#c48a0e"
-COLOR_LIGHT = "#f9fafc"
-COLOR_WHITE = "#ffffff"
-PLOTLY_COLORS = ["#4763a2", "#c48a0e", "#6ba368", "#d4615e"]
+# ============================================
+# CABECERA Y LOGO
+# ============================================
+
+logo_path = BASE_DIR / "assets" / "logo.png"
+
+if logo_path.exists():
+    logo = Image.open(logo_path)
+    st.image(logo, width=120)
+
+st.title("Perfil Educativo con Enfoque Montessori")
+st.markdown(
+    """
+    Esta aplicación ofrece una **lectura pedagógica orientativa**
+    basada en principios Montessori.
+    
+    No evalúa, no diagnostica ni clasifica al niño.
+    Su objetivo es **acompañar la observación educativa**
+    y apoyar la adaptación del entorno.
+    """
+)
 
 
-# =========================================================
-# CARGA DE MODELOS (con caché)
-# =========================================================
-@st.cache_resource
-def cargar_modelos():
-    modelos_dir = BASE_DIR / "models"
-    with open(modelos_dir / "modelo_ml.pkl", "rb") as f:
-        modelo = pickle.load(f)
-    with open(modelos_dir / "kmeans.pkl", "rb") as f:
-        kmeans_model = pickle.load(f)
-    with open(modelos_dir / "scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
-    return modelo, kmeans_model, scaler
+# ============================================
+# PALETA DE COLORES - IDENTIDAD VISUAL
+# ============================================
+
+# Colores principales de marca
+COLOR_NAVY  = "#4763a2"   # estructura, confianza
+COLOR_GOLD  = "#c48a0e"   # valor, potencial
+COLOR_LIGHT = "#f9fafc"   # entorno preparado
+COLOR_WHITE = "#ffffff"   # claridad
+
+# Paleta para visualizaciones
+PLOTLY_COLORS = [
+    "#4763a2",  # navy
+    "#c48a0e",  # gold
+    "#6ba368",  # verde equilibrio
+    "#d4615e"   # terracota atención pedagógica
+]
+# ============================================
+# ESTILO VISUAL (CSS SUAVE)
+# ============================================
+
+st.markdown(
+    f"""
+    <style>
+        .stApp {{
+            background-color: {COLOR_LIGHT};
+            color: {COLOR_NAVY};
+        }}
+        h1, h2, h3 {{
+            color: {COLOR_NAVY};
+        }}
+        .stButton > button {{
+            background-color: {COLOR_NAVY};
+            color: {COLOR_WHITE};
+            border-radius: 6px;
+        }}
+        .stButton > button:hover {{
+            background-color: {COLOR_GOLD};
+            color: {COLOR_WHITE};
+        }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
-# =========================================================
-# CARGA DE DATOS (con caché)
-# =========================================================
-@st.cache_data
-def cargar_datos_rendimiento():
-    return pd.read_csv(BASE_DIR / "data" / "StudentPerformanceFactors.csv")
+# ============================================
+# — CARGA DE DATOS BASE
+# ============================================
 
+DATA_DIR = BASE_DIR / "data"
+DATA_FILE = DATA_DIR / "studentperformancefactors.csv"
 
-@st.cache_data
-def cargar_datos_pantalla():
-    return pd.read_csv(BASE_DIR / "data" / "screen_time.csv")
-
-
-@st.cache_data
-def cargar_ied_por_grupo():
-    return pd.read_csv(BASE_DIR / "data" / "ied_by_age_group.csv")
-
-
-@st.cache_data
-def computar_indices(df_raw):
-    """Reproduce el cálculo de ISEE, IAA, IBE desde el CSV crudo."""
-    df = df_raw.copy()
-
-    # --- Limpieza de nulos ---
-    for col in ["Teacher_Quality", "Parental_Education_Level"]:
-        if col in df.columns and df[col].isnull().any():
-            df[col] = df[col].fillna(df[col].mode()[0])
-
-    # --- ISEE ---
-    level_map = {"Low": 1, "Medium": 2, "High": 3}
-    for col in ["Parental_Involvement", "Access_to_Resources", "Teacher_Quality"]:
-        df[col] = df[col].map(level_map)
-
-    isee_raw = (
-        0.4 * df["Parental_Involvement"]
-        + 0.35 * df["Access_to_Resources"]
-        + 0.25 * df["Teacher_Quality"]
+if not DATA_FILE.exists():
+    st.error(
+        "No se encuentra el archivo de datos base "
+        "`studentperformancefactors.csv` en la carpeta /data."
     )
-    df["ISEE"] = MinMaxScaler().fit_transform(isee_raw.values.reshape(-1, 1)).ravel()
+    st.stop()
 
-    # --- IAA ---
-    motivation_map = {"Low": 1, "Medium": 2, "High": 3}
-    df["Motivation_Level"] = df["Motivation_Level"].map(motivation_map)
+try:
+    df_raw = pd.read_csv(DATA_FILE)
+except Exception:
+    st.error("Error al cargar el archivo de datos base.")
+    st.stop()
 
-    norm_cols = ["Hours_Studied", "Attendance", "Motivation_Level", "Tutoring_Sessions"]
-    scaler_iaa = MinMaxScaler()
-    df[norm_cols] = scaler_iaa.fit_transform(df[norm_cols])
+st.success("Datos cargados correctamente.")
 
-    iaa_raw = (
-        0.30 * df["Hours_Studied"]
-        + 0.30 * df["Attendance"]
-        + 0.25 * df["Motivation_Level"]
-        - 0.15 * df["Tutoring_Sessions"]
+# Validación de columnas requeridas para el análisis y la evaluación pedagógica.
+COLUMNAS_REQUERIDAS = [
+    "Hours_Studied",
+    "Sleep_Hours",
+    "Attendance",
+    "Teacher_Quality",
+    "Parental_Involvement",
+    "Motivation_Level",
+    "Learning_Disabilities"
+]
+
+faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df_raw.columns]
+
+if faltantes:
+    st.error(
+        f"El dataset no contiene las columnas requeridas: {faltantes}"
     )
-    df["IAA"] = MinMaxScaler().fit_transform(iaa_raw.values.reshape(-1, 1)).ravel()
-
-    # --- IBE ---
-    peer_map = {"Positive": 1, "Neutral": 0, "Negative": -1}
-    df["Peer_Influence_num"] = df["Peer_Influence"].map(peer_map)
-    df["Peer_Influence_norm"] = (df["Peer_Influence_num"] - (-1)) / (1 - (-1))
-
-    ibe_scaler = MinMaxScaler()
-    df[["Sleep_Hours_norm", "Physical_Activity_norm"]] = ibe_scaler.fit_transform(
-        df[["Sleep_Hours", "Physical_Activity"]]
-    )
-
-    ibe_raw = (
-        0.30 * df["Sleep_Hours_norm"]
-        + 0.25 * df["Physical_Activity_norm"]
-        + 0.20 * df["Peer_Influence_norm"]
-        + 0.15 * df["Motivation_Level"]
-        + 0.10 * df["Attendance"]
-    )
-    df["IBE"] = MinMaxScaler().fit_transform(ibe_raw.values.reshape(-1, 1)).ravel()
-
-    # --- Target: Desajuste ---
-    df["Score_Desajuste"] = 0
-    df.loc[(df["ISEE"] > 0.65) & (df["IAA"] < 0.35), "Score_Desajuste"] += 2
-    df.loc[(df["ISEE"] < 0.35) & (df["IAA"] > 0.65), "Score_Desajuste"] += 2
-    df.loc[(df["ISEE"] > 0.6) & (df["IAA"] < 0.45), "Score_Desajuste"] += 1
-    df.loc[(df["ISEE"] < 0.4) & (df["IAA"] > 0.55), "Score_Desajuste"] += 1
-    df.loc[(df["IBE"] < 0.4) & (df["IAA"] > 0.5), "Score_Desajuste"] += 1
-    df["Desajuste"] = np.where(df["Score_Desajuste"] >= 1, 1, 0)
-
-    return df
+    st.stop()
 
 
-@st.cache_data
-def obtener_metricas_modelo(df):
-    """Entrena el modelo en vivo para obtener métricas reproducibles."""
-    X = df[["ISEE", "IAA", "IBE"]]
-    y = df["Desajuste"]
+# ============================================
+# LIMPIEZA BÁSICA DEL DATASET
+# ============================================
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+# Copia de trabajo (preservamos datos originales)
+df = df_raw.copy()
 
-    pipeline = Pipeline([
-        ("scaler", StandardScaler()),
-        ("model", LogisticRegression(max_iter=1000, class_weight="balanced")),
-    ])
-    pipeline.fit(X_train, y_train)
-    y_pred = pipeline.predict(X_test)
-    y_proba = pipeline.predict_proba(X_test)[:, 1]
+# Eliminar filas completamente vacías
+df.dropna(how="all", inplace=True)
 
-    report = classification_report(y_test, y_pred, output_dict=True)
-    accuracy = report["accuracy"]
+# Asegurar tipos numéricos donde corresponde
+COLUMNAS_NUMERICAS = [
+    "Hours_Studied",
+    "Sleep_Hours",
+    "Attendance"
+]
 
-    # Silhouette del KMeans existente
-    cluster_scaler = StandardScaler()
-    X_scaled = cluster_scaler.fit_transform(X)
-    from sklearn.cluster import KMeans as _KM
-    km = _KM(n_clusters=4, random_state=42, n_init=10)
-    labels = km.fit_predict(X_scaled)
-    sil = silhouette_score(X_scaled, labels)
+for col in COLUMNAS_NUMERICAS:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    centroids_df = pd.DataFrame(
-        km.cluster_centers_,
-        columns=["ISEE", "IAA", "IBE"],
-    )
-    centroids_df.index.name = "Cluster"
 
-    cluster_counts = pd.Series(labels).value_counts().sort_index()
+with st.expander("Vista previa del dataset base"):
+    st.dataframe(df.head())
 
-    return {
-        "report": report,
-        "accuracy": accuracy,
-        "silhouette": sil,
-        "y_proba": y_proba,
-        "y_test": y_test,
-        "centroids": centroids_df,
-        "cluster_counts": cluster_counts,
-        "labels": labels,
-    }
+st.markdown(
+    """
+    ### Preparación del entorno de datos
+
+    El dataset base ha sido cargado y validado correctamente.
+    En esta etapa solo se realizan verificaciones estructurales y limpieza mínima,
+    sin introducir aún interpretaciones pedagógicas.
+
+    En los siguientes pasos se construirán los índices educativos
+    siguiendo criterios Montessori.
+    """
+)
+
+# =========================================================
+
 
 
 # =========================================================
@@ -379,12 +282,6 @@ MENSAJES_DESAJUSTE = {
 }
 
 
-# =========================================================
-# FUNCIÓN DE AJUSTE POR ESCENARIO DIGITAL (IED)
-# =========================================================
-def ajustar_riesgo_por_ied(probabilidad_base, ied):
-    ajuste = 1 + SENSIBILIDAD_IED * (0.5 - ied)
-    return min(max(probabilidad_base * ajuste, 0), 1)
 
 
 # =========================================================
