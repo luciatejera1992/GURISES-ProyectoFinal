@@ -60,21 +60,16 @@ BASE_DIR = Path(__file__).parent
 
 logo_path = BASE_DIR / "assets" / "logo.png"
 
-if logo_path.exists():
-    logo = Image.open(logo_path)
-    st.image(logo, width=120)
-
-st.title("Perfil Educativo con Enfoque Montessori")
-st.markdown(
-    """
-    Esta aplicación ofrece una **lectura pedagógica orientativa**
-    basada en principios Montessori.
-    
-    No evalúa, no diagnostica ni clasifica al niño.
-    Su objetivo es **acompañar la observación educativa**
-    y apoyar la adaptación del entorno.
-    """
-)
+col_logo, col_title = st.columns([1, 5])
+with col_logo:
+    st.image(logo_path, width=100)
+with col_title:
+    st.markdown(
+        "<h2 style='margin-bottom:0;color:#4763a2;'>GURISES</h2>"
+        "<p style='margin-top:0;color:#555;font-size:1.1em;'>"
+        "Un Caracol Montessori — Herramienta de lectura pedagógica</p>",
+        unsafe_allow_html=True,
+    )
 
 
 # ============================================
@@ -143,18 +138,22 @@ except Exception:
     st.error("Error al cargar el archivo de datos base.")
     st.stop()
 
-st.success("Datos cargados correctamente.")
 
 # Validación de columnas requeridas para el análisis y la evaluación pedagógica.
 COLUMNAS_REQUERIDAS = [
     "Hours_Studied",
-    "Sleep_Hours",
     "Attendance",
-    "Teacher_Quality",
+    "Tutoring_Sessions",
+    "Sleep_Hours",
+    "Physical_Activity",
     "Parental_Involvement",
+    "Access_to_Resources",
+    "Teacher_Quality",
     "Motivation_Level",
-    "Learning_Disabilities"
+    "Peer_Influence",
+    "School_Type"
 ]
+
 
 faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df_raw.columns]
 
@@ -186,81 +185,72 @@ for col in COLUMNAS_NUMERICAS:
     df[col] = pd.to_numeric(df[col], errors="coerce")
 
 
-with st.expander("Vista previa del dataset base"):
-    st.dataframe(df.head())
 
-st.markdown(
-    """
-    ### Preparación del entorno de datos
 
-    El dataset base ha sido cargado y validado correctamente.
-    En esta etapa solo se realizan verificaciones estructurales y limpieza mínima,
-    sin introducir aún interpretaciones pedagógicas.
-
-    En los siguientes pasos se construirán los índices educativos
-    siguiendo criterios Montessori.
-    """
-)
 
 # =========================================================
 # CONSTRUCCIÓN DE ÍNDICES PEDAGÓGICOS
 # =========================================================
-
-st.markdown(
-    """
-    ## Construcción de índices pedagógicos
-
-    A partir de los datos disponibles, se construyen **índices pedagógicos**
-    que permiten una lectura educativa más integrada.
-
-    Estos índices no miden rendimiento ni diagnostican,
-    sino que **sintetizan patrones de observación**
-    relacionados con el entorno, la autonomía y el bienestar.
-    """
-)
 
 from sklearn.preprocessing import MinMaxScaler
 
 def construir_indices_pedagogicos(df: pd.DataFrame) -> pd.DataFrame:
     """
     Construye índices pedagógicos Montessori a partir de variables observables.
-
-    Los índices representan dimensiones educativas clave y se utilizan
-    exclusivamente para observación pedagógica, no para predicción.
+    Traduce observaciones cualitativas a escalas ordinales explícitas.
     """
 
     df = df.copy()
 
     # ----------------------------
-    # Normalización de variables numéricas
+    # Codificación ordinal pedagógica
     # ----------------------------
-    columnas_a_normalizar = [
+    MAPA_ORDINAL = {
+        "Low": 0.33,
+        "Medium": 0.66,
+        "High": 1.0
+    }
+
+    COLUMNAS_ORDINALES = [
         "Parental_Involvement",
         "Access_to_Resources",
         "Teacher_Quality",
-        "Hours_Studied",
-        "Attendance",
         "Motivation_Level",
-        "Tutoring_Sessions",
-        "Sleep_Hours",
-        "Physical_Activity",
         "Peer_Influence"
     ]
 
-    scaler = MinMaxScaler()
-    df[columnas_a_normalizar] = scaler.fit_transform(df[columnas_a_normalizar])
+    for col in COLUMNAS_ORDINALES:
+        df[col] = df[col].map(MAPA_ORDINAL)
+        df[col] = df[col].fillna(0.5)  # valor neutro pedagógico
 
     # ----------------------------
-    # Codificación pedagógica de School Type
+    # Escalado de variables numéricas reales
     # ----------------------------
-    # Se interpreta como disponibilidad estructural de recursos
+    COLUMNAS_NUMERICAS = [
+        "Hours_Studied",
+        "Attendance",
+        "Tutoring_Sessions",
+        "Sleep_Hours",
+        "Physical_Activity"
+    ]
+
+    df[COLUMNAS_NUMERICAS] = df[COLUMNAS_NUMERICAS].fillna(
+        df[COLUMNAS_NUMERICAS].median()
+    )
+
+    scaler = MinMaxScaler()
+    df[COLUMNAS_NUMERICAS] = scaler.fit_transform(df[COLUMNAS_NUMERICAS])
+
+    # ----------------------------
+    # Codificación School Type
+    # ----------------------------
     df["School_Type_Num"] = df["School_Type"].map({
         "Public": 0.7,
         "Private": 1.0
     })
 
     # ----------------------------
-    # ISEE — Índice de Entorno Preparado
+    # ISEE — indice de soporte del entorno educativo
     # ----------------------------
     df["ISEE"] = (
         df["Parental_Involvement"] * 0.25 +
@@ -270,17 +260,17 @@ def construir_indices_pedagogicos(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # ----------------------------
-    # IAA — Índice de Autonomía y Autodisciplina
+    # IAA — Autonomía y autodisciplina
     # ----------------------------
     df["IAA"] = (
         df["Hours_Studied"] * 0.30 +
         df["Attendance"] * 0.30 +
-        df["Motivation_Level"] * 0.25 -
+        df["Motivation_Level"] * 0.25 +
         df["Tutoring_Sessions"] * 0.15
     )
 
     # ----------------------------
-    # IBE — Índice de Bienestar Integral
+    # IBE — Indice de bienestar y equilibrio
     # ----------------------------
     df["IBE"] = (
         df["Sleep_Hours"] * 0.35 +
@@ -291,17 +281,14 @@ def construir_indices_pedagogicos(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+# ============================================
+# APLICACIÓN DE ÍNDICES PEDAGÓGICOS
+# ============================================
 
 df = construir_indices_pedagogicos(df)
 
-with st.expander("Ver índices pedagógicos calculados"):
-    st.dataframe(
-        df[["ISEE", "IAA", "IBE"]].head()
-    )
-
-
 # ============================================
-# BLOQUE 4 — ÍNDICE DE OBSERVACIÓN EDUCATIVA
+#  ÍNDICE DE OBSERVACIÓN EDUCATIVA
 # ============================================
 
 # Pesos pedagógicos (suman 1)
@@ -320,33 +307,16 @@ df["indice_observacion_educativa"] = (
 # Valores más altos indican mayor necesidad de observación pedagógica,
 # no riesgo ni diagnóstico.
 
-st.markdown(
-    """
-    ## Índice de observación educativa
+# ============================================
+# BLINDAJE FINAL ANTES DE CLUSTERING
+# ============================================
 
-    El **índice de observación educativa** integra distintas dimensiones
-    del desarrollo para orientar la mirada pedagógica.
-
-    Un valor más alto indica que puede ser útil **observar con mayor atención**
-    cómo el entorno, la autonomía y el bienestar interactúan en el proceso educativo.
-
-    Este índice **no evalúa ni diagnostica**; acompaña la observación y la adaptación del entorno.
-    """
-)
-
-
-# =========================================================
-# Ver índice de observación educativa
-with st.expander("Ver índice de observación educativa (ejemplos)"):
-    st.dataframe(
-        df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
-    )
-
-# =========================================================
-
+for col in ["ISEE", "IAA", "IBE"]:
+    if df[col].isna().any():
+        df[col] = df[col].fillna(df[col].median())
 
 # ============================================
-# BLOQUE 5 — CLUSTERING Y PERFILES
+# CLUSTERING Y PERFILES
 # ============================================
 
 X_cluster = df[["ISEE", "IAA", "IBE"]]
@@ -373,32 +343,58 @@ df["Perfil_Final"] = "Perfil educativo equilibrado"
 df.loc[~df["Condicion_Base_OK"], "Perfil_Final"] = "Condición de base comprometida"
 df.loc[df["Condicion_Base_OK"], "Perfil_Final"] = df["cluster_id"].map(cluster_labels)
 
-# ============================================
-# VISUALIZACIÓN
-# ============================================
 
-fig = px.scatter(
-    df,
-    x="ISEE",
-    y="IAA",
-    color="Perfil_Final",
-    hover_data=["IBE", "indice_observacion_educativa"],
-    color_discrete_sequence=PLOTLY_COLORS
+# =========================================================
+# INTERACTIVIDAD — SELECCIÓN DE CASO
+# =========================================================
+
+st.sidebar.header("Observación individual")
+
+indice_caso_sel = st.sidebar.selectbox(
+    "Selecciona un caso para observar",
+    options=df.index,
+    format_func=lambda x: f"Caso {x}"
 )
 
-fig.update_layout(
-    plot_bgcolor=COLOR_WHITE,
-    paper_bgcolor=COLOR_LIGHT,
-    font_color=COLOR_NAVY,
-    title="Perfiles educativos – Entorno y Autonomía"
+df_caso = df.loc[[indice_caso_sel]]
+
+perfil_caso = df_caso["Perfil_Final"].iloc[0]
+indice_caso = float(df_caso["indice_observacion_educativa"].iloc[0])
+
+
+# =========================================================
+# INTERACTIVIDAD — SELECCIÓN DE PERFIL EDUCATIVO
+# =========================================================
+
+st.sidebar.header("Exploración pedagógica")
+
+PERFILES_DISPONIBLES = [
+    "Perfil educativo equilibrado",
+    "Entorno favorable con autonomía en construcción",
+    "Perfil con autonomía alta y entorno exigente",
+    "Perfil con bienestar comprometido",
+    "Condición de base comprometida"
+]
+
+perfil_seleccionado = st.sidebar.selectbox(
+    "Selecciona un perfil educativo para observar",
+    options=PERFILES_DISPONIBLES
 )
 
-st.plotly_chart(fig, use_container_width=True)
+# =========================================================
+# PESTAÑAS PRINCIPALES
+# =========================================================
 
-
+tab_inicio, tab_datos, tab_indices, tab_perfiles, tab_metodo = st.tabs([
+    " Inicio",
+    " Datos y contexto",
+    " Índices pedagógicos",
+    " Perfiles educativos",
+    " Metodología"
+])
 
 # ============================================
-# BLOQUE 6 — MENSAJES PEDAGÓGICOS POR PERFIL
+# MENSAJES PEDAGÓGICOS POR PERFIL
 # ============================================
 
 MENSAJES_PERFIL = {
@@ -512,25 +508,294 @@ def mensaje_alerta_orientativa(valor_indice: float) -> str:
 
 
 
-# =========================================================
 
-indice_medio = float(df["indice_observacion_educativa"].mean())
-perfil_dominante = df["Perfil_Final"].mode().iloc[0]
+# =======================================================
 
 
-# ========================================================
+# =============================================================
+# PESTAÑA 1 — INICIO
+# =============================================================
+with tab_inicio:
+    st.title("Perfil educativo con enfoque Montessori")
 
-st.markdown("## Orientación pedagógica")
+    st.markdown(
+        """
+        Esta aplicación ofrece una **lectura pedagógica orientativa**
+        basada en principios Montessori.
 
-# Mensaje por perfil
-st.markdown(MENSAJES_PERFIL.get(perfil_dominante, ""))
+        No evalúa, no diagnostica ni clasifica al niño.
+        Su finalidad es **acompañar la observación educativa**
+        y apoyar la adaptación consciente del entorno.
 
-# Alerta orientativa
-st.markdown("### Nivel de observación sugerido")
-st.markdown(mensaje_alerta_orientativa(indice_medio))
+        La herramienta está diseñada para ser utilizada por
+        familias, docentes y equipos educativos.
+        """
+    )
 
-st.caption(
-    "Las orientaciones son descriptivas y no constituyen "
-    "evaluación, diagnóstico ni clasificación."
+
+
+# =============================================================
+# PESTAÑA 2 — DATOS Y CONTEXTO
+# =============================================================
+
+with tab_datos:
+    st.header("Datos y contexto")
+
+    st.markdown(
+        """
+        Los datos utilizados provienen de un **dataset educativo estructurado**
+        que recoge información observacional sobre hábitos de estudio,
+        entorno educativo y variables de bienestar.
+
+        En esta sección se presenta el **contexto general de los datos**
+        y su estructura, sin realizar interpretaciones pedagógicas.
+        """
+    )
+
+
+    with st.expander("Estructura del dataset"):
+        st.markdown(
+            f"""
+            - Número de registros: **{df_raw.shape[0]}**
+            - Número de variables: **{df_raw.shape[1]}**
+            """
+        )
+        st.dataframe(
+            pd.DataFrame({
+                "Variable": df_raw.columns,
+                "Tipo de dato": df_raw.dtypes.astype(str)
+            })
+        )
+
+    st.info(
+        """
+        **Nota metodológica**
+
+        En esta etapa solo se realizan verificaciones estructurales
+        y limpieza mínima de los datos.
+
+        No se introducen interpretaciones pedagógicas ni conclusiones.
+        Estas se desarrollan posteriormente a través de los índices educativos.
+        """
+    )
+
+# =============================================================
+# PESTAÑA 3 — ÍNDICES PEDAGÓGICOS
+# =============================================================
+
+with tab_indices:
+    st.header("Índices pedagógicos")
+
+    st.markdown(
+    """
+
+    A partir de los datos disponibles, se construyen **índices pedagógicos**
+    que permiten una lectura educativa más integrada.
+
+    Estos índices no miden rendimiento ni diagnostican,
+    sino que **sintetizan patrones de observación**
+    relacionados con el entorno, la autonomía y el bienestar.
+    """
+)
+    st.markdown(
+        """
+        Los índices pedagógicos permiten una lectura integrada
+        del entorno, la autonomía y el bienestar, en coherencia
+        con la pedagogía Montessori.
+        """
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("ISEE\nEntorno", f"{df_caso['ISEE'].iloc[0]:.2f}")
+    col2.metric("IAA\nAutonomía", f"{df_caso['IAA'].iloc[0]:.2f}")
+    col3.metric("IBE\nBienestar", f"{df_caso['IBE'].iloc[0]:.2f}")
+    col4.metric(
+        "Índice de observación",
+        f"{df_caso['indice_observacion_educativa'].iloc[0]:.2f}"
+    )
+
+    with st.expander("Ver índices"):
+        st.dataframe(
+            df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
+        )
+
+
+    st.markdown(
+    """
+    ## Índice de observación educativa
+
+    El **índice de observación educativa** integra distintas dimensiones
+    del desarrollo para orientar la mirada pedagógica.
+
+    Un valor más alto indica que puede ser útil **observar con mayor atención**
+    cómo el entorno, la autonomía y el bienestar interactúan en el proceso educativo.
+
+    Este índice **no evalúa ni diagnostica**; acompaña la observación y la adaptación del entorno.
+    """
 )
 
+# =========================================================
+# Ver índice de observación educativa
+
+    with st.expander("Ver índice de observación educativa"):
+        st.dataframe(
+        df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
+    )
+
+
+
+# =============================================================
+# PESTAÑA 4 — PERFILES EDUCATIVOS
+# =============================================================
+
+# =============================================================
+# PESTAÑA 4 — PERFILES EDUCATIVOS
+# =============================================================
+
+with tab_perfiles:
+    st.header("Perfiles educativos")
+
+    st.markdown(
+        """
+        Los perfiles educativos representan **patrones generales observados**
+        en el conjunto de datos.
+
+        No describen a un niño en particular, sino **configuraciones del entorno,
+        la autonomía y el bienestar** que ayudan a orientar la observación pedagógica.
+        """
+    )
+
+    # ---------------------------------------------------------
+    # Selección de perfil (control principal de interacción)
+    # ---------------------------------------------------------
+
+    st.markdown("### Exploración pedagógica")
+
+    perfil_seleccionado = st.radio(
+        "Selecciona un perfil educativo",
+        options=PERFILES_DISPONIBLES,
+        horizontal=True
+    )
+
+    # Dataset filtrado por perfil
+    df_perfil = df[df["Perfil_Final"] == perfil_seleccionado]
+
+    # ---------------------------------------------------------
+    # Visualización pedagógica del perfil (RADAR)
+    # ---------------------------------------------------------
+
+    perfil_media = {
+        "Entorno (ISEE)": df_perfil["ISEE"].mean(),
+        "Autonomía (IAA)": df_perfil["IAA"].mean(),
+        "Bienestar (IBE)": df_perfil["IBE"].mean()
+    }
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatterpolar(
+            r=list(perfil_media.values()),
+            theta=list(perfil_media.keys()),
+            fill="toself",
+            name=perfil_seleccionado,
+            line_color=COLOR_GOLD
+        )
+    )
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1]
+            )
+        ),
+        showlegend=False,
+        title="Configuración pedagógica del perfil",
+        paper_bgcolor=COLOR_LIGHT,
+        font_color=COLOR_NAVY
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.caption(
+        "La visualización representa valores medios del perfil educativo seleccionado. "
+        "No describe casos individuales ni emite juicios diagnósticos."
+    )
+
+    st.markdown("---")
+
+    # ---------------------------------------------------------
+    # Orientación pedagógica asociada al perfil
+    # ---------------------------------------------------------
+
+    st.subheader("Orientación pedagógica asociada al perfil")
+
+    st.markdown(MENSAJES_PERFIL.get(perfil_seleccionado, ""))
+
+    st.info(
+        "La orientación describe **condiciones del entorno educativo** y posibles "
+        "focos de observación. No constituye evaluación, diagnóstico ni clasificación individual."
+    )
+
+# =============================================================
+# PESTAÑA 5 — METODOLOGÍA
+# =============================================================
+
+with tab_metodo:
+    st.header("Metodología")
+
+    st.markdown(
+        """
+        ### Enfoque pedagógico
+
+        Esta herramienta se fundamenta en los principios de la **pedagogía Montessori**
+        tal como son definidos por la *Asociación Montessori Internacional (AMI)*,
+        donde la observación científica del niño precede a cualquier intervención.
+
+        En este marco, el objetivo no es predecir conductas ni clasificar,
+        sino **comprender patrones de relación entre el entorno, la autonomía y el bienestar**
+        para favorecer una adaptación consciente del ambiente educativo.
+        """
+    )
+
+    st.markdown(
+        """
+        ### Enfoque metodológico y técnico
+
+        - Construcción de **índices pedagógicos** a partir de variables observables
+        - Uso de **clustering no supervisado (K-Means)** para identificar patrones generales
+        - Ausencia deliberada de modelos predictivos supervisados
+        - Prioridad en la **interpretabilidad** sobre la precisión predictiva
+        """
+    )
+
+    st.markdown(
+        """
+        ### Decisiones clave del diseño
+
+        **Por qué no se utiliza un modelo predictivo supervisado**
+
+        En coherencia con Montessori, no se dispone de un *ground truth* clínico
+        ni se busca predecir resultados individuales.
+        Utilizar modelos supervisados en este contexto podría inducir
+        a interpretaciones deterministas o diagnósticas,
+        contrarias al enfoque pedagógico de respeto al desarrollo.
+
+        **Por qué se utilizan índices pedagógicos**
+
+        Los índices permiten sintetizar observaciones complejas
+        sin reducir al niño a una etiqueta,
+        favoreciendo una lectura integrada y reflexiva del proceso educativo.
+        """
+    )
+
+    st.info(
+        """
+        **Nota ética y pedagógica**
+
+        Esta aplicación no emite diagnósticos, evaluaciones ni recomendaciones prescriptivas.
+        Su función es **acompañar la observación pedagógica**
+        y apoyar la reflexión del adulto responsable del entorno educativo.
+        """
+    )
