@@ -203,9 +203,6 @@ st.markdown(
 )
 
 # =========================================================
-
-
-
 # =========================================================
 # MENSAJES POR PERFIL EDUCATIVO
 # =========================================================
@@ -319,7 +316,7 @@ tab_inicio, tab_eval, tab_datos, tab_modelo, tab_metodo = st.tabs([
     "Inicio",
     "Evaluación",
     "Exploración de datos",
-    "Modelo y clustering",
+    "Clustering",
     "Metodología",
 ])
 
@@ -370,7 +367,7 @@ with tab_inicio:
         )
 
     st.markdown("")
-    st.subheader("Los 4 índices pedagógicos")
+    st.subheader("Los 3 índices pedagógicos")
 
     idx_col1, idx_col2 = st.columns(2)
     with idx_col1:
