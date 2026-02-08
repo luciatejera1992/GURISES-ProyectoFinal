@@ -657,18 +657,6 @@ with tab_indices:
 
 
 
-    st.markdown("")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("ISEE\nEntorno", f"{df_caso['ISEE'].iloc[0]:.2f}")
-    col2.metric("IAA\nAutonomía", f"{df_caso['IAA'].iloc[0]:.2f}")
-    col3.metric("IBE\nBienestar", f"{df_caso['IBE'].iloc[0]:.2f}")
-    col4.metric(
-        "Índice de observación",
-        f"{df_caso['indice_observacion_educativa'].iloc[0]:.2f}"
-    )
-
     with st.expander("Ver índices"):
         st.dataframe(
             df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
@@ -734,6 +722,7 @@ with tab_perfiles:
     # Visualización pedagógica del perfil (RADAR)
     # ---------------------------------------------------------
 
+
     perfil_media = {
         "Entorno (ISEE)": df_perfil["ISEE"].mean(),
         "Autonomía (IAA)": df_perfil["IAA"].mean(),
@@ -777,14 +766,13 @@ with tab_perfiles:
     # ---------------------------------------------------------
     # Orientación pedagógica asociada al perfil
     # ---------------------------------------------------------
-
     st.subheader("Orientación pedagógica asociada al perfil")
 
     st.markdown(MENSAJES_PERFIL.get(perfil_seleccionado, ""))
 
     st.info(
-        "La orientación describe **condiciones del entorno educativo** y posibles "
-        "focos de observación. No constituye evaluación, diagnóstico ni clasificación individual."
+    "La orientación describe **condiciones del entorno educativo** y posibles "
+    "focos de observación. No constituye evaluación, diagnóstico ni clasificación individual."
     )
 
 # =============================================================
