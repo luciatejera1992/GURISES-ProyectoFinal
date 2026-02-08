@@ -67,7 +67,7 @@ with col_title:
     st.markdown(
         "<h2 style='margin-bottom:0;color:#4763a2;'>GURISES</h2>"
         "<p style='margin-top:0;color:#555;font-size:1.1em;'>"
-        "Un Caracol Montessori — Herramienta de lectura pedagógica</p>",
+        "Un Caracol Montessori · Herramienta de lectura pedagógica</p>",
         unsafe_allow_html=True,
     )
 
@@ -411,7 +411,6 @@ MENSAJES_PERFIL = {
 
     *Fundamento Montessori*:
     > “Cuando el ambiente es adecuado, el niño trabaja y se construye a sí mismo.”
-    — :contentReference[oaicite:0]{index=0}
     """,
 
     "Entorno favorable con autonomía en construcción": """
@@ -427,7 +426,6 @@ MENSAJES_PERFIL = {
 
     *Fundamento Montessori*:
     > “La ayuda innecesaria es un obstáculo para el desarrollo.”
-    — :contentReference[oaicite:1]{index=1}
     """,
 
     "Perfil con autonomía alta y entorno exigente": """
@@ -443,7 +441,6 @@ MENSAJES_PERFIL = {
 
     *Fundamento Montessori*:
     > “El desarrollo necesita tiempo y condiciones favorables.”
-    — :contentReference[oaicite:2]{index=2}
     """,
 
     "Perfil con bienestar comprometido": """
@@ -459,7 +456,6 @@ MENSAJES_PERFIL = {
 
     *Fundamento Montessori*:
     > “Sin equilibrio físico y emocional, el trabajo profundo no puede sostenerse.”
-    — :contentReference[oaicite:3]{index=3}
     """,
 
     "Condición de base comprometida": """
@@ -475,7 +471,6 @@ MENSAJES_PERFIL = {
 
     *Fundamento Montessori*:
     > “La paz es la base de la educación.”
-    — :contentReference[oaicite:4]{index=4}
     """
 }
 
@@ -516,7 +511,7 @@ def mensaje_alerta_orientativa(valor_indice: float) -> str:
 # PESTAÑA 1 — INICIO
 # =============================================================
 with tab_inicio:
-    st.title("Perfil educativo con enfoque Montessori")
+    st.header("GURISES, DATOS, DESARROLLO Y EDUCACIÓN")
 
     st.markdown(
         """
@@ -531,6 +526,8 @@ with tab_inicio:
         familias, docentes y equipos educativos.
         """
     )
+
+
 
 
 
@@ -579,12 +576,40 @@ with tab_datos:
         """
     )
 
+
+    col1, col2 = st.columns(2)
+with col1: 
+    st.subheader("¿Qué es Montessori?")
+    st.markdown(
+        """
+        La pedagogía Montessori se fundamenta en la observación científica,
+        y en la creación de un entorno preparado que favorezca el desarrollo natural.""")
+
+    st.markdown("""Pilares de la pedagogía Montessori
+
+**El niño:** protagonista activo de su propio desarrollo, guiado por sus ritmos internos y su capacidad natural de aprendizaje.
+
+**El ambiente preparado:** espacio cuidadosamente diseñado para favorecer la autonomía, el orden y la exploración independiente.
+
+**El adulto como guía:** observa, acompaña y ajusta el entorno sin interferir innecesariamente en el proceso del niño.
+
+**Los materiales:** herramientas concretas y autocorrectivas que permiten aprender a través de la experiencia directa.
+
+    """)
+    with col2:
+        st.image(
+        "assets/1-María-Montessori.jpg",
+        caption="María Montessori (Italia 1870-1952)"
+    )
+
+
 # =============================================================
 # PESTAÑA 3 — ÍNDICES PEDAGÓGICOS
 # =============================================================
 
 with tab_indices:
     st.header("Índices pedagógicos")
+
 
     st.markdown(
     """
@@ -604,6 +629,35 @@ with tab_indices:
         con la pedagogía Montessori.
         """
     )
+
+    st.divider()
+
+    idx_col1, idx_col2, idx_col3 = st.columns(3)
+    with idx_col1:
+        st.markdown("""
+        **ISEE — Entorno preparado**
+
+        Mide la calidad del ambiente educativo: orden, recursos, apoyo parental
+        y calidad docente. Un entorno preparado facilita la autonomía y la concentración.
+        """)
+    with idx_col2:
+        st.markdown("""
+        **IAA — Autonomía y autodisciplina**
+
+        Evalúa la capacidad del niño para iniciar y sostener actividades por cuenta propia,
+        mantener el interés y depender menos de estímulos externos.
+        """)
+    with idx_col3:
+        st.markdown("""
+        **IBE — Bienestar y equilibrio**
+
+        Refleja el estado físico, emocional y social del niño. El bienestar es condición
+        indispensable para el aprendizaje profundo.
+    """)
+
+
+
+    st.markdown("")
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -643,11 +697,6 @@ with tab_indices:
         df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
     )
 
-
-
-# =============================================================
-# PESTAÑA 4 — PERFILES EDUCATIVOS
-# =============================================================
 
 # =============================================================
 # PESTAÑA 4 — PERFILES EDUCATIVOS
@@ -799,3 +848,47 @@ with tab_metodo:
         y apoyar la reflexión del adulto responsable del entorno educativo.
         """
     )
+
+# --- Pipeline ---
+    st.subheader("Pipeline de datos")
+    st.markdown("""
+    1. **Carga y limpieza**: `StudentPerformanceFactors.csv` (6,607 registros). Nulos en `Teacher_Quality` (78) y `Parental_Education_Level` (90) imputados con la moda.
+    2. **Mapeo de variables categóricas**: Low/Medium/High a 1/2/3, Yes/No a 1/0, Peer_Influence a 1/0/−1.
+    3. **Normalización**: MinMaxScaler aplicado a componentes individuales antes de combinar en índices.
+    4. **Construcción de índices**: ISEE, IAA, IBE, indice de observación educativa, calculados como combinaciones lineales ponderadas.
+    6. **KMeans (k=4)**: Clustering sobre [ISEE, IAA, IBE] estandarizados con StandardScaler.
+    """)
+    st.divider()
+
+
+# --- Citas Montessori ---
+    st.subheader("Fundamentos pedagógicos")
+    st.markdown("""
+    > *"El niño no es un vaso que se llena, sino una fuente que se deja brotar."*
+    > — Maria Montessori
+
+    > *"Cuando el ambiente es adecuado, el niño trabaja y se construye a sí mismo."*
+    > — *La mente absorbente del niño*
+
+    > *"La ayuda innecesaria es un obstáculo para el desarrollo."*
+    > — *El niño*
+
+    > *"El desarrollo necesita tiempo y condiciones favorables."*
+    > — *El niño en familia*
+
+    > *"Sin equilibrio físico y emocional, el trabajo profundo no puede sostenerse."*
+    > — *El niño*
+    """)
+
+    st.divider()
+
+    # --- Contacto ---
+    st.subheader("Créditos y contacto")
+    st.markdown("""
+    **Proyecto GURISES** — Un Caracol Montessori
+
+    Herramienta de lectura pedagógica orientativa, desarrollada con fines educativos.
+    No sustituye la observación profesional ni la evaluación clínica.
+
+    Inspirada en la pedagogía Montessori y la visión de la Asociación Montessori Internacional (AMI).
+    """)
