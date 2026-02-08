@@ -344,29 +344,9 @@ df.loc[~df["Condicion_Base_OK"], "Perfil_Final"] = "Condición de base compromet
 df.loc[df["Condicion_Base_OK"], "Perfil_Final"] = df["cluster_id"].map(cluster_labels)
 
 
-# =========================================================
-# INTERACTIVIDAD — SELECCIÓN DE CASO
-# =========================================================
-
-st.sidebar.header("Observación individual")
-
-indice_caso_sel = st.sidebar.selectbox(
-    "Selecciona un caso para observar",
-    options=df.index,
-    format_func=lambda x: f"Caso {x}"
-)
-
-df_caso = df.loc[[indice_caso_sel]]
-
-perfil_caso = df_caso["Perfil_Final"].iloc[0]
-indice_caso = float(df_caso["indice_observacion_educativa"].iloc[0])
 
 
-# =========================================================
-# INTERACTIVIDAD — SELECCIÓN DE PERFIL EDUCATIVO
-# =========================================================
 
-st.sidebar.header("Exploración pedagógica")
 
 PERFILES_DISPONIBLES = [
     "Perfil educativo equilibrado",
@@ -376,10 +356,6 @@ PERFILES_DISPONIBLES = [
     "Condición de base comprometida"
 ]
 
-perfil_seleccionado = st.sidebar.selectbox(
-    "Selecciona un perfil educativo para observar",
-    options=PERFILES_DISPONIBLES
-)
 
 # =========================================================
 # PESTAÑAS PRINCIPALES
