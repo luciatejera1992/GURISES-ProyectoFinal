@@ -63,7 +63,16 @@ Desarrollo de una aplicación interactiva en Streamlit, pensada para familias, d
 
 ## Aplicación Interactiva
 
-El proyecto incluye una aplicación interactiva desarrollada con **Streamlit** que permite analizar el desajuste educativo de manera dinámica. Esta herramienta facilita la exploración de los datos y la visualización de los índices sintéticos creados, proporcionando una experiencia intuitiva para los usuarios interesados en comprender los factores que afectan el desarrollo infantil y adolescente.
+La aplicación desarrollada con Streamlit permite:
+
+Explorar la estructura del dataset y sus variables.
+
+Visualizar índices pedagógicos construidos a partir de observaciones educativas.
+
+Analizar perfiles educativos orientativos mediante clustering.
+
+
+La experiencia está diseñada para ser intuitiva, explicable y éticamente responsable.
 
 Para ejecutar la aplicación interactiva, utiliza el siguiente comando:
 ```bash
@@ -72,10 +81,27 @@ streamlit run app.py
 
 ## Metodología
 
-El proyecto utiliza técnicas de análisis de datos y aprendizaje automático para:
-- Identificar factores clave que afectan el desarrollo infantil y adolescente.
-- Crear índices sintéticos que cuantifiquen estos factores.
-- Evaluar el impacto del desajuste educativo en el desarrollo integral.
+El proyecto se apoya en los siguientes principios metodológicos:
+
+Análisis exploratorio de datos (EDA) como base de comprensión.
+
+Construcción de índices sintéticos interpretables.
+
+Clustering no supervisado para identificar patrones generales.
+
+Ausencia deliberada de modelos predictivos supervisados.
+
+
+Desde el punto de vista pedagógico, el proyecto se alinea con los principios definidos por la Asociación Montessori Internacional (AMI):
+
+Observación antes que intervención.
+
+El entorno como agente educativo.
+
+El bienestar como condición de base.
+
+La autonomía como proceso, no como resultado.
+
 
 ## Visualizaciones
 
@@ -96,7 +122,5 @@ Para preguntas o sugerencias:
 - **Email**: luciatejera1992@gmail.com
 
 ---
-
-😊
 
 
