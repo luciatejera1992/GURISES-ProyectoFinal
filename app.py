@@ -536,7 +536,7 @@ with tab_inicio:
 # =============================================================
 
 with tab_datos:
-    st.header("Datos y contexto")
+    st.subheader("Datos")
 
     st.markdown(
         """
