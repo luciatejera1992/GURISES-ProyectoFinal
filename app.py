@@ -1,23 +1,28 @@
+# ============================================
+# IMPORTACIONES
+# ============================================
+
+# Framework de la app
 import streamlit as st
+
+# Manipulación de datos
 import pandas as pd
 import numpy as np
-import pickle
-from pathlib import Path
-from PIL import Image
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.metrics import classification_report, silhouette_score
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
+
+# Visualización
 import plotly.express as px
 import plotly.graph_objects as go
 
-# =========================================================
-# CONSTANTES
-# =========================================================
-THRESHOLD_PEDAGOGICO = 0.65
-THRESHOLD_CONDICION_BASE = 0.25
-SENSIBILIDAD_IED = 0.3
+# Preprocesamiento (solo para clustering no supervisado)
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.cluster import KMeans
+
+# Gestión de archivos y rutas
+from pathlib import Path
+
+# Imágenes (logo / marca)
+from PIL import Image
+
 
 # =========================================================
 # CONFIGURACIÓN GENERAL
@@ -28,113 +33,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
-<style>
 
-/* ================= BASE ================= */
-.stApp {
-    background-color: #ffffff;
-}
+# ============================================
+# UMBRALES PEDAGÓGICOS (REFERENCIAS ORIENTATIVAS)
+# ============================================
 
-/* ================= TIPOGRAFÍA ================= */
-[data-testid="stTitle"] h1 {
-    color: #4763a2 !important;
-    font-weight: 700 !important;
-    margin-bottom: 0.2em;
-}
+THRESHOLD_PEDAGOGICO = 0.65
+# Punto de atención pedagógica.
+# Indica necesidad de observación más cuidadosa.
+# No constituye diagnóstico ni clasificación.
 
-[data-testid="stHeader"] h2 {
-    color: #4763a2 !important;
-    font-weight: 700 !important;
-    margin-top: 1.6em;
-}
-
-[data-testid="stSubheader"] h3 {
-    color: #c48a0e !important;
-    font-weight: 600 !important;
-    margin-bottom: 0.6em;
-}
-
-p, li, label, span {
-    font-size: 34px;
-    line-height: 1.6;
-}
-
-/* ================= CAJAS MONTESSORI ================= */
-.montessori-box {
-    background-color: #f9fafc;
-    border-left: 6px solid #c48a0e;
-    padding: 1.6em;
-    border-radius: 14px;
-    margin-bottom: 1.6em;
-}
-
-/* ================= TARJETAS MÉTRICAS ================= */
-.metric-card {
-    background-color: #f9fafc;
-    border-radius: 14px;
-    padding: 1.4em;
-    text-align: center;
-    border: 1px solid #e0e4ed;
-}
-
-.metric-card h2 {
-    color: #4763a2 !important;
-    font-size: 2.2em;
-    margin: 0;
-    font-weight: 700;
-}
-
-.metric-card p {
-    color: #555;
-    font-size: 0.95em;
-    margin: 0.3em 0 0 0;
-}
-
-/* ================= INPUTS ================= */
-.montessori-box input,
-.montessori-box select,
-.montessori-box textarea {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    border-radius: 10px !important;
-}
-
-.montessori-box [data-testid="stNumberInput"],
-.montessori-box [data-testid="stSelectbox"],
-.montessori-box [data-testid="stSlider"],
-.montessori-box [data-testid="stTextInput"] {
-    background-color: #ffffff !important;
-    border-radius: 10px;
-    padding: 0.4em;
-}
-
-/* ================= BOTÓN ================= */
-.stButton > button {
-    background-color: #4763a2 !important;
-    color: white !important;
-    border-radius: 14px;
-    padding: 0.7em 1.8em;
-    font-weight: 600;
-    border: none;
-}
-
-.stButton > button:hover {
-    background-color: #36508c !important;
-}
-
-/* ================= TABS ================= */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-}
-
-.stTabs [data-baseweb="tab"] {
-    padding: 10px 24px;
-    font-weight: 600;
-}
-
-</style>
-""", unsafe_allow_html=True)
+THRESHOLD_CONDICION_BASE = 0.25
+# Umbral mínimo de condición de base (bienestar).
+# Si no se alcanza, se prioriza el acompañamiento
+# antes de interpretar cualquier perfil educativo.
 
 
 # =========================================================
@@ -142,904 +54,778 @@ p, li, label, span {
 # =========================================================
 BASE_DIR = Path(__file__).parent
 
-# =========================================================
-# PALETA DE COLORES
-# =========================================================
-COLOR_NAVY = "#4763a2"
-COLOR_GOLD = "#c48a0e"
-COLOR_LIGHT = "#f9fafc"
-COLOR_WHITE = "#ffffff"
-PLOTLY_COLORS = ["#4763a2", "#c48a0e", "#6ba368", "#d4615e"]
+# ============================================
+# CABECERA Y LOGO
+# ============================================
 
+logo_path = BASE_DIR / "assets" / "logo.png"
 
-# =========================================================
-# CARGA DE MODELOS (con caché)
-# =========================================================
-@st.cache_resource
-def cargar_modelos():
-    modelos_dir = BASE_DIR / "models"
-    with open(modelos_dir / "modelo_ml.pkl", "rb") as f:
-        modelo = pickle.load(f)
-    with open(modelos_dir / "kmeans.pkl", "rb") as f:
-        kmeans_model = pickle.load(f)
-    with open(modelos_dir / "scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
-    return modelo, kmeans_model, scaler
-
-
-# =========================================================
-# CARGA DE DATOS (con caché)
-# =========================================================
-@st.cache_data
-def cargar_datos_rendimiento():
-    return pd.read_csv(BASE_DIR / "data" / "StudentPerformanceFactors.csv")
-
-
-@st.cache_data
-def cargar_datos_pantalla():
-    return pd.read_csv(BASE_DIR / "data" / "screen_time.csv")
-
-
-@st.cache_data
-def cargar_ied_por_grupo():
-    return pd.read_csv(BASE_DIR / "data" / "ied_by_age_group.csv")
-
-
-@st.cache_data
-def computar_indices(df_raw):
-    """Reproduce el cálculo de ISEE, IAA, IBE desde el CSV crudo."""
-    df = df_raw.copy()
-
-    # --- Limpieza de nulos ---
-    for col in ["Teacher_Quality", "Parental_Education_Level"]:
-        if col in df.columns and df[col].isnull().any():
-            df[col] = df[col].fillna(df[col].mode()[0])
-
-    # --- ISEE ---
-    level_map = {"Low": 1, "Medium": 2, "High": 3}
-    for col in ["Parental_Involvement", "Access_to_Resources", "Teacher_Quality"]:
-        df[col] = df[col].map(level_map)
-
-    isee_raw = (
-        0.4 * df["Parental_Involvement"]
-        + 0.35 * df["Access_to_Resources"]
-        + 0.25 * df["Teacher_Quality"]
-    )
-    df["ISEE"] = MinMaxScaler().fit_transform(isee_raw.values.reshape(-1, 1)).ravel()
-
-    # --- IAA ---
-    motivation_map = {"Low": 1, "Medium": 2, "High": 3}
-    df["Motivation_Level"] = df["Motivation_Level"].map(motivation_map)
-
-    norm_cols = ["Hours_Studied", "Attendance", "Motivation_Level", "Tutoring_Sessions"]
-    scaler_iaa = MinMaxScaler()
-    df[norm_cols] = scaler_iaa.fit_transform(df[norm_cols])
-
-    iaa_raw = (
-        0.30 * df["Hours_Studied"]
-        + 0.30 * df["Attendance"]
-        + 0.25 * df["Motivation_Level"]
-        - 0.15 * df["Tutoring_Sessions"]
-    )
-    df["IAA"] = MinMaxScaler().fit_transform(iaa_raw.values.reshape(-1, 1)).ravel()
-
-    # --- IBE ---
-    peer_map = {"Positive": 1, "Neutral": 0, "Negative": -1}
-    df["Peer_Influence_num"] = df["Peer_Influence"].map(peer_map)
-    df["Peer_Influence_norm"] = (df["Peer_Influence_num"] - (-1)) / (1 - (-1))
-
-    ibe_scaler = MinMaxScaler()
-    df[["Sleep_Hours_norm", "Physical_Activity_norm"]] = ibe_scaler.fit_transform(
-        df[["Sleep_Hours", "Physical_Activity"]]
-    )
-
-    ibe_raw = (
-        0.30 * df["Sleep_Hours_norm"]
-        + 0.25 * df["Physical_Activity_norm"]
-        + 0.20 * df["Peer_Influence_norm"]
-        + 0.15 * df["Motivation_Level"]
-        + 0.10 * df["Attendance"]
-    )
-    df["IBE"] = MinMaxScaler().fit_transform(ibe_raw.values.reshape(-1, 1)).ravel()
-
-    # --- Target: Desajuste ---
-    df["Score_Desajuste"] = 0
-    df.loc[(df["ISEE"] > 0.65) & (df["IAA"] < 0.35), "Score_Desajuste"] += 2
-    df.loc[(df["ISEE"] < 0.35) & (df["IAA"] > 0.65), "Score_Desajuste"] += 2
-    df.loc[(df["ISEE"] > 0.6) & (df["IAA"] < 0.45), "Score_Desajuste"] += 1
-    df.loc[(df["ISEE"] < 0.4) & (df["IAA"] > 0.55), "Score_Desajuste"] += 1
-    df.loc[(df["IBE"] < 0.4) & (df["IAA"] > 0.5), "Score_Desajuste"] += 1
-    df["Desajuste"] = np.where(df["Score_Desajuste"] >= 1, 1, 0)
-
-    return df
-
-
-@st.cache_data
-def obtener_metricas_modelo(df):
-    """Entrena el modelo en vivo para obtener métricas reproducibles."""
-    X = df[["ISEE", "IAA", "IBE"]]
-    y = df["Desajuste"]
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    pipeline = Pipeline([
-        ("scaler", StandardScaler()),
-        ("model", LogisticRegression(max_iter=1000, class_weight="balanced")),
-    ])
-    pipeline.fit(X_train, y_train)
-    y_pred = pipeline.predict(X_test)
-    y_proba = pipeline.predict_proba(X_test)[:, 1]
-
-    report = classification_report(y_test, y_pred, output_dict=True)
-    accuracy = report["accuracy"]
-
-    # Silhouette del KMeans existente
-    cluster_scaler = StandardScaler()
-    X_scaled = cluster_scaler.fit_transform(X)
-    from sklearn.cluster import KMeans as _KM
-    km = _KM(n_clusters=4, random_state=42, n_init=10)
-    labels = km.fit_predict(X_scaled)
-    sil = silhouette_score(X_scaled, labels)
-
-    centroids_df = pd.DataFrame(
-        km.cluster_centers_,
-        columns=["ISEE", "IAA", "IBE"],
-    )
-    centroids_df.index.name = "Cluster"
-
-    cluster_counts = pd.Series(labels).value_counts().sort_index()
-
-    return {
-        "report": report,
-        "accuracy": accuracy,
-        "silhouette": sil,
-        "y_proba": y_proba,
-        "y_test": y_test,
-        "centroids": centroids_df,
-        "cluster_counts": cluster_counts,
-        "labels": labels,
-    }
-
-
-# =========================================================
-# MENSAJES POR PERFIL EDUCATIVO
-# =========================================================
-MENSAJES_PERFIL = {
-    0: """
-    **Perfil educativo equilibrado**
-
-    El entorno, la autonomía y el bienestar están en armonía, favoreciendo el desarrollo natural.
-    Recomendación: Mantener la coherencia del ambiente y observar sin intervenir innecesariamente.
-
-    *Fundamento Montessori*: "Cuando el ambiente es adecuado, el niño trabaja y se construye a sí mismo."
-    (*La mente absorbente del niño*)
-    """,
-    1: """
-    **Entorno favorable, autonomía en construcción**
-
-    El entorno es adecuado, pero la autonomía está en desarrollo. Reflexionar sobre:
-    - Grado de ayuda ofrecida.
-    - Oportunidades reales de elección.
-    - Tiempo permitido para el error y la repetición.
-
-    *Fundamento Montessori*: "La ayuda innecesaria es un obstáculo para el desarrollo."
-    (*El niño*)
-    """,
-    2: """
-    **Autonomía alta, entorno exigente**
-
-    Aunque la autonomía es alta, el entorno puede ser demasiado exigente. Recomendación:
-    - Simplificar el ambiente.
-    - Reducir estímulos y expectativas externas.
-
-    *Fundamento Montessori*: "El desarrollo necesita tiempo y condiciones favorables."
-    (*El niño en familia*)
-    """,
-    3: """
-    **Bienestar comprometido**
-
-    El bienestar está afectado, limitando el aprendizaje. Prioridad:
-    - Restablecer calma y equilibrio emocional.
-    - Reducir demandas innecesarias.
-
-    *Fundamento Montessori*: "Sin equilibrio físico y emocional, el trabajo profundo no puede sostenerse."
-    (*El niño*)
-    """,
-}
-
-MENSAJES_DESAJUSTE = {
-    0: """
-    **Señal leve de desajuste**
-
-    Puede haber una incoherencia puntual entre el entorno y el desarrollo actual. Recomendación:
-    - Observar con atención.
-    - Ajustar pequeñas variables del ambiente si es necesario.
-    """,
-    1: """
-    **Exceso de ayuda o estructuración**
-
-    Revisar si el adulto está anticipándose a procesos que el niño podría asumir. Recomendación:
-    - Retirar apoyos innecesarios progresivamente.
-    """,
-    2: """
-    **Exigencias ambientales elevadas**
-
-    El entorno puede estar sobrestimulado o con expectativas altas. Recomendación:
-    - Reducir presión externa.
-    - Ofrecer espacios de pausa y reflexión.
-    """,
-    3: """
-    **Bienestar comprometido**
-
-    El bienestar está afectado. Prioridad:
-    - Restablecer calma y equilibrio emocional antes de nuevas intervenciones.
-    """,
-}
-
-
-# =========================================================
-# FUNCIÓN DE AJUSTE POR ESCENARIO DIGITAL (IED)
-# =========================================================
-def ajustar_riesgo_por_ied(probabilidad_base, ied):
-    ajuste = 1 + SENSIBILIDAD_IED * (0.5 - ied)
-    return min(max(probabilidad_base * ajuste, 0), 1)
-
-
-# =========================================================
-# CARGA INICIAL
-# =========================================================
-try:
-    model, kmeans, scaler_cluster = cargar_modelos()
-except FileNotFoundError as e:
-    st.error(f"No se encontró un archivo de modelo: {e.filename}")
-    st.stop()
-except Exception as e:
-    st.error(f"Error al cargar los modelos: {e}")
-    st.stop()
-
-logo = Image.open(BASE_DIR / "assets" / "logo.png")
-
-# =========================================================
-# HEADER
-# =========================================================
 col_logo, col_title = st.columns([1, 5])
 with col_logo:
-    st.image(logo, width=100)
+    st.image(logo_path, width=100)
 with col_title:
     st.markdown(
         "<h2 style='margin-bottom:0;color:#4763a2;'>GURISES</h2>"
         "<p style='margin-top:0;color:#555;font-size:1.1em;'>"
-        "Un Caracol Montessori — Herramienta de lectura pedagógica</p>",
+        "Un Caracol Montessori · Herramienta de lectura pedagógica</p>",
         unsafe_allow_html=True,
     )
+
+
+# ============================================
+# PALETA DE COLORES - IDENTIDAD VISUAL
+# ============================================
+
+# Colores principales de marca
+COLOR_NAVY  = "#4763a2"   # estructura, confianza
+COLOR_GOLD  = "#c48a0e"   # valor, potencial
+COLOR_LIGHT = "#f9fafc"   # entorno preparado
+COLOR_WHITE = "#ffffff"   # claridad
+
+# Paleta para visualizaciones
+PLOTLY_COLORS = [
+    "#4763a2",  # navy
+    "#c48a0e",  # gold
+    "#6ba368",  # verde equilibrio
+    "#d4615e"   # terracota atención pedagógica
+]
+# ============================================
+# ESTILO VISUAL (CSS SUAVE)
+# ============================================
+
+st.markdown(
+    f"""
+    <style>
+        .stApp {{
+            background-color: {COLOR_LIGHT};
+            color: {COLOR_NAVY};
+        }}
+        h1, h2, h3 {{
+            color: {COLOR_NAVY};
+        }}
+        .stButton > button {{
+            background-color: {COLOR_NAVY};
+            color: {COLOR_WHITE};
+            border-radius: 6px;
+        }}
+        .stButton > button:hover {{
+            background-color: {COLOR_GOLD};
+            color: {COLOR_WHITE};
+        }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ============================================
+# — CARGA DE DATOS BASE
+# ============================================
+
+DATA_DIR = BASE_DIR / "data"
+DATA_FILE = DATA_DIR / "studentperformancefactors.csv"
+
+if not DATA_FILE.exists():
+    st.error(
+        "No se encuentra el archivo de datos base "
+        "`studentperformancefactors.csv` en la carpeta /data."
+    )
+    st.stop()
+
+try:
+    df_raw = pd.read_csv(DATA_FILE)
+except Exception:
+    st.error("Error al cargar el archivo de datos base.")
+    st.stop()
+
+
+# Validación de columnas requeridas para el análisis y la evaluación pedagógica.
+COLUMNAS_REQUERIDAS = [
+    "Hours_Studied",
+    "Attendance",
+    "Tutoring_Sessions",
+    "Sleep_Hours",
+    "Physical_Activity",
+    "Parental_Involvement",
+    "Access_to_Resources",
+    "Teacher_Quality",
+    "Motivation_Level",
+    "Peer_Influence",
+    "School_Type"
+]
+
+
+faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df_raw.columns]
+
+if faltantes:
+    st.error(
+        f"El dataset no contiene las columnas requeridas: {faltantes}"
+    )
+    st.stop()
+
+
+# ============================================
+# LIMPIEZA BÁSICA DEL DATASET
+# ============================================
+
+# Copia de trabajo (preservamos datos originales)
+df = df_raw.copy()
+
+# Eliminar filas completamente vacías
+df.dropna(how="all", inplace=True)
+
+# Asegurar tipos numéricos donde corresponde
+COLUMNAS_NUMERICAS = [
+    "Hours_Studied",
+    "Sleep_Hours",
+    "Attendance"
+]
+
+for col in COLUMNAS_NUMERICAS:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+
+
+
+
+# =========================================================
+# CONSTRUCCIÓN DE ÍNDICES PEDAGÓGICOS
+# =========================================================
+
+from sklearn.preprocessing import MinMaxScaler
+
+def construir_indices_pedagogicos(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Construye índices pedagógicos Montessori a partir de variables observables.
+    Traduce observaciones cualitativas a escalas ordinales explícitas.
+    """
+
+    df = df.copy()
+
+    # ----------------------------
+    # Codificación ordinal pedagógica
+    # ----------------------------
+    MAPA_ORDINAL = {
+        "Low": 0.33,
+        "Medium": 0.66,
+        "High": 1.0
+    }
+
+    COLUMNAS_ORDINALES = [
+        "Parental_Involvement",
+        "Access_to_Resources",
+        "Teacher_Quality",
+        "Motivation_Level",
+        "Peer_Influence"
+    ]
+
+    for col in COLUMNAS_ORDINALES:
+        df[col] = df[col].map(MAPA_ORDINAL)
+        df[col] = df[col].fillna(0.5)  # valor neutro pedagógico
+
+    # ----------------------------
+    # Escalado de variables numéricas reales
+    # ----------------------------
+    COLUMNAS_NUMERICAS = [
+        "Hours_Studied",
+        "Attendance",
+        "Tutoring_Sessions",
+        "Sleep_Hours",
+        "Physical_Activity"
+    ]
+
+    df[COLUMNAS_NUMERICAS] = df[COLUMNAS_NUMERICAS].fillna(
+        df[COLUMNAS_NUMERICAS].median()
+    )
+
+    scaler = MinMaxScaler()
+    df[COLUMNAS_NUMERICAS] = scaler.fit_transform(df[COLUMNAS_NUMERICAS])
+
+    # ----------------------------
+    # Codificación School Type
+    # ----------------------------
+    df["School_Type_Num"] = df["School_Type"].map({
+        "Public": 0.7,
+        "Private": 1.0
+    })
+
+    # ----------------------------
+    # ISEE — indice de soporte del entorno educativo
+    # ----------------------------
+    df["ISEE"] = (
+        df["Parental_Involvement"] * 0.25 +
+        df["Access_to_Resources"] * 0.25 +
+        df["School_Type_Num"] * 0.20 +
+        df["Teacher_Quality"] * 0.30
+    )
+
+    # ----------------------------
+    # IAA — Autonomía y autodisciplina
+    # ----------------------------
+    df["IAA"] = (
+        df["Hours_Studied"] * 0.30 +
+        df["Attendance"] * 0.30 +
+        df["Motivation_Level"] * 0.25 +
+        df["Tutoring_Sessions"] * 0.15
+    )
+
+    # ----------------------------
+    # IBE — Indice de bienestar y equilibrio
+    # ----------------------------
+    df["IBE"] = (
+        df["Sleep_Hours"] * 0.35 +
+        df["Physical_Activity"] * 0.25 +
+        df["Motivation_Level"] * 0.20 +
+        df["Peer_Influence"] * 0.20
+    )
+
+    return df
+
+# ============================================
+# APLICACIÓN DE ÍNDICES PEDAGÓGICOS
+# ============================================
+
+df = construir_indices_pedagogicos(df)
+
+# ============================================
+#  ÍNDICE DE OBSERVACIÓN EDUCATIVA
+# ============================================
+
+# Pesos pedagógicos (suman 1)
+W_IBE = 0.40   # Bienestar integral (condición habilitante)
+W_ISEE = 0.30  # Entorno preparado
+W_IAA = 0.30   # Autonomía y autodisciplina
+
+df["indice_observacion_educativa"] = (
+    W_IBE * (1 - df["IBE"]) +
+    W_ISEE * (1 - df["ISEE"]) +
+    W_IAA * (1 - df["IAA"])
+).clip(0, 1)
+
+# Nota:
+# El índice es continuo y orientativo.
+# Valores más altos indican mayor necesidad de observación pedagógica,
+# no riesgo ni diagnóstico.
+
+# ============================================
+# BLINDAJE FINAL ANTES DE CLUSTERING
+# ============================================
+
+for col in ["ISEE", "IAA", "IBE"]:
+    if df[col].isna().any():
+        df[col] = df[col].fillna(df[col].median())
+
+# ============================================
+# CLUSTERING Y PERFILES
+# ============================================
+
+X_cluster = df[["ISEE", "IAA", "IBE"]]
+X_cluster_scaled = MinMaxScaler().fit_transform(X_cluster)
+
+kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
+df["cluster_id"] = kmeans.fit_predict(X_cluster_scaled)
+
+centroids = pd.DataFrame(kmeans.cluster_centers_, columns=["ISEE", "IAA", "IBE"])
+
+cluster_labels = {}
+for idx, row in centroids.iterrows():
+    if row["IBE"] < 0.4:
+        cluster_labels[idx] = "Perfil con bienestar comprometido"
+    elif row["ISEE"] > 0.6 and row["IAA"] > 0.6:
+        cluster_labels[idx] = "Perfil educativo equilibrado"
+    elif row["ISEE"] > row["IAA"]:
+        cluster_labels[idx] = "Entorno favorable con autonomía en construcción"
+    else:
+        cluster_labels[idx] = "Perfil con autonomía alta y entorno exigente"
+
+df["Condicion_Base_OK"] = df["IBE"] >= THRESHOLD_CONDICION_BASE
+df["Perfil_Final"] = "Perfil educativo equilibrado"
+df.loc[~df["Condicion_Base_OK"], "Perfil_Final"] = "Condición de base comprometida"
+df.loc[df["Condicion_Base_OK"], "Perfil_Final"] = df["cluster_id"].map(cluster_labels)
+
+
+
+
+
+
+PERFILES_DISPONIBLES = [
+    "Perfil educativo equilibrado",
+    "Entorno favorable con autonomía en construcción",
+    "Perfil con autonomía alta y entorno exigente",
+    "Perfil con bienestar comprometido",
+    "Condición de base comprometida"
+]
+
 
 # =========================================================
 # PESTAÑAS PRINCIPALES
 # =========================================================
-tab_inicio, tab_eval, tab_datos, tab_modelo, tab_metodo = st.tabs([
-    "Inicio",
-    "Evaluación",
-    "Exploración de datos",
-    "Modelo y clustering",
-    "Metodología",
+
+tab_inicio, tab_datos, tab_indices, tab_perfiles, tab_metodo = st.tabs([
+    " Inicio",
+    " Datos y contexto",
+    " Índices pedagógicos",
+    " Perfiles educativos",
+    " Metodología"
 ])
+
+# ============================================
+# MENSAJES PEDAGÓGICOS POR PERFIL
+# ============================================
+
+MENSAJES_PERFIL = {
+    "Perfil educativo equilibrado": """
+    ### Perfil educativo equilibrado
+
+    El entorno, la autonomía y el bienestar se encuentran en armonía,
+    favoreciendo un desarrollo fluido y autónomo.
+
+    **Orientación pedagógica**
+    - Mantener la coherencia del ambiente.
+    - Evitar intervenciones innecesarias.
+    - Observar con confianza los procesos naturales de aprendizaje.
+
+    *Fundamento Montessori*:
+    > “Cuando el ambiente es adecuado, el niño trabaja y se construye a sí mismo.”
+    """,
+
+    "Entorno favorable con autonomía en construcción": """
+    ### Entorno favorable con autonomía en construcción
+
+    El entorno ofrece buenas condiciones, mientras que la autonomía
+    se encuentra aún en proceso de consolidación.
+
+    **Orientación pedagógica**
+    - Revisar el grado de ayuda ofrecida.
+    - Aumentar oportunidades reales de elección.
+    - Permitir tiempo suficiente para el error y la repetición.
+
+    *Fundamento Montessori*:
+    > “La ayuda innecesaria es un obstáculo para el desarrollo.”
+    """,
+
+    "Perfil con autonomía alta y entorno exigente": """
+    ### Autonomía alta con entorno exigente
+
+    La autonomía está bien desarrollada, pero el entorno puede estar
+    resultando excesivamente demandante o estructurado.
+
+    **Orientación pedagógica**
+    - Simplificar el ambiente.
+    - Reducir estímulos y expectativas externas.
+    - Priorizar el ritmo individual.
+
+    *Fundamento Montessori*:
+    > “El desarrollo necesita tiempo y condiciones favorables.”
+    """,
+
+    "Perfil con bienestar comprometido": """
+    ### Bienestar comprometido
+
+    El bienestar físico y/o emocional se encuentra afectado,
+    lo que limita los procesos de aprendizaje profundo.
+
+    **Prioridad pedagógica**
+    - Restablecer calma y equilibrio emocional.
+    - Reducir demandas y exigencias innecesarias.
+    - Acompañar sin presionar.
+
+    *Fundamento Montessori*:
+    > “Sin equilibrio físico y emocional, el trabajo profundo no puede sostenerse.”
+    """,
+
+    "Condición de base comprometida": """
+    ### Condición de base comprometida
+
+    Antes de interpretar cualquier perfil educativo,
+    es necesario atender las condiciones básicas de bienestar.
+
+    **Prioridad pedagógica**
+    - Garantizar seguridad, calma y cuidado.
+    - Suspender expectativas de rendimiento.
+    - Acompañar desde la presencia adulta.
+
+    *Fundamento Montessori*:
+    > “La paz es la base de la educación.”
+    """
+}
+
+
+# ============================================
+
+def mensaje_alerta_orientativa(valor_indice: float) -> str:
+    """
+    Devuelve un mensaje orientativo según el nivel del índice
+    de observación educativa. No clasifica ni diagnostica.
+    """
+    if valor_indice < 0.33:
+        return (
+            "🟢 **Observación tranquila**\n\n"
+            "El nivel de observación sugerido es bajo. "
+            "Se recomienda continuar observando sin introducir cambios innecesarios."
+        )
+    elif valor_indice < THRESHOLD_PEDAGOGICO:
+        return (
+            "🟡 **Observación atenta**\n\n"
+            "Puede ser útil observar con mayor atención la interacción "
+            "entre el entorno, la autonomía y el bienestar."
+        )
+    else:
+        return (
+            "🟠 **Observación prioritaria**\n\n"
+            "Se recomienda priorizar la observación pedagógica "
+            "y revisar posibles ajustes del entorno antes de introducir nuevas exigencias."
+        )
+
+
+
+
+# =======================================================
 
 
 # =============================================================
 # PESTAÑA 1 — INICIO
 # =============================================================
 with tab_inicio:
-    st.markdown("")
+    st.header("GURISES, DATOS, DESARROLLO Y EDUCACIÓN")
 
-    st.markdown("""
-    <div class="montessori-box">
-    <p>
-    Esta herramienta se inspira en la <strong>pedagogía Montessori</strong> y en la visión
-    del desarrollo infantil promovida por la <em>Asociación Montessori Internacional (AMI)</em>.
-    </p>
-    <p>
-    No evalúa, no clasifica ni etiqueta. Propone una <strong>lectura orientativa</strong>
-    del equilibrio entre el entorno, la autonomía y el bienestar.
-    </p>
-    <p>
-    Invita a <strong>observar el ambiente</strong> y reflexionar
-    sobre cómo puede ajustarse para acompañar mejor
-    el desarrollo natural de cada criatura.
-    </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        Esta aplicación ofrece una **lectura pedagógica orientativa**
+        basada en principios Montessori.
 
-    # --- Tarjetas métricas ---
-    col1, col2, col3 = st.columns(3)
-    with col1:
+        No evalúa, no diagnostica ni clasifica al niño.
+        Su finalidad es **acompañar la observación educativa**
+        y apoyar la adaptación consciente del entorno.
+
+        La herramienta está diseñada para ser utilizada por
+        familias, docentes y equipos educativos.
+        """
+    )
+
+
+
+
+
+# =============================================================
+# PESTAÑA 2 — DATOS Y CONTEXTO
+# =============================================================
+
+with tab_datos:
+    st.subheader("Datos")
+
+    st.markdown(
+        """
+        Los datos utilizados provienen de un **dataset educativo estructurado**
+        que recoge información observacional sobre hábitos de estudio,
+        entorno educativo y variables de bienestar.
+
+        En esta sección se presenta el **contexto general de los datos**
+        y su estructura, sin realizar interpretaciones pedagógicas.
+        """
+    )
+
+
+    with st.expander("Estructura del dataset"):
         st.markdown(
-            '<div class="metric-card"><h2>6,607</h2>'
-            "<p>Registros analizados</p></div>",
-            unsafe_allow_html=True,
+            f"""
+            - Número de registros: **{df_raw.shape[0]}**
+            - Número de variables: **{df_raw.shape[1]}**
+            """
         )
+        st.dataframe(
+            pd.DataFrame({
+                "Variable": df_raw.columns,
+                "Tipo de dato": df_raw.dtypes.astype(str)
+            })
+        )
+
+    st.info(
+        """
+        **Nota metodológica**
+
+        En esta etapa solo se realizan verificaciones estructurales
+        y limpieza mínima de los datos.
+
+        No se introducen interpretaciones pedagógicas ni conclusiones.
+        Estas se desarrollan posteriormente a través de los índices educativos.
+        """
+    )
+
+
+    col1, col2 = st.columns(2)
+with col1: 
+    st.subheader("¿Qué es Montessori?")
+    st.markdown(
+        """
+        La pedagogía Montessori se fundamenta en la observación científica,
+        y en la creación de un entorno preparado que favorezca el desarrollo natural.""")
+
+    st.markdown("""Pilares de la pedagogía Montessori
+
+**El niño:** protagonista activo de su propio desarrollo, guiado por sus ritmos internos y su capacidad natural de aprendizaje.
+
+**El ambiente preparado:** espacio cuidadosamente diseñado para favorecer la autonomía, el orden y la exploración independiente.
+
+**El adulto como guía:** observa, acompaña y ajusta el entorno sin interferir innecesariamente en el proceso del niño.
+
+**Los materiales:** herramientas concretas y autocorrectivas que permiten aprender a través de la experiencia directa.
+
+    """)
     with col2:
-        st.markdown(
-            '<div class="metric-card"><h2>4</h2>'
-            "<p>Índices pedagógicos</p></div>",
-            unsafe_allow_html=True,
-        )
-    with col3:
-        st.markdown(
-            '<div class="metric-card"><h2>4</h2>'
-            "<p>Perfiles educativos</p></div>",
-            unsafe_allow_html=True,
-        )
+        st.image(
+        "assets/1-María-Montessori.jpg",
+        caption="María Montessori (Italia 1870-1952)"
+    )
 
-    st.markdown("")
-    st.subheader("Los 4 índices pedagógicos")
 
-    idx_col1, idx_col2 = st.columns(2)
+# =============================================================
+# PESTAÑA 3 — ÍNDICES PEDAGÓGICOS
+# =============================================================
+
+with tab_indices:
+    st.header("Índices pedagógicos")
+
+
+    st.markdown(
+    """
+
+    A partir de los datos disponibles, se construyen **índices pedagógicos**
+    que permiten una lectura educativa más integrada.
+
+    Estos índices no miden rendimiento ni diagnostican,
+    sino que **sintetizan patrones de observación**
+    relacionados con el entorno, la autonomía y el bienestar.
+    """
+)
+    st.markdown(
+        """
+        Los índices pedagógicos permiten una lectura integrada
+        del entorno, la autonomía y el bienestar, en coherencia
+        con la pedagogía Montessori.
+        """
+    )
+
+    st.divider()
+
+    idx_col1, idx_col2, idx_col3 = st.columns(3)
     with idx_col1:
         st.markdown("""
         **ISEE — Entorno preparado**
 
         Mide la calidad del ambiente educativo: orden, recursos, apoyo parental
         y calidad docente. Un entorno preparado facilita la autonomía y la concentración.
-
+        """)
+    with idx_col2:
+        st.markdown("""
         **IAA — Autonomía y autodisciplina**
 
         Evalúa la capacidad del niño para iniciar y sostener actividades por cuenta propia,
         mantener el interés y depender menos de estímulos externos.
         """)
-    with idx_col2:
+    with idx_col3:
         st.markdown("""
         **IBE — Bienestar y equilibrio**
 
         Refleja el estado físico, emocional y social del niño. El bienestar es condición
         indispensable para el aprendizaje profundo.
-
-        **IED — Entorno digital**
-
-        Considera cómo el uso de pantallas influye en el desarrollo.
-        Se utiliza como factor de ajuste en la lectura pedagógica.
-        """)
-
-    st.divider()
-    st.markdown("""
-    ### Cómo funciona
-
-    1. **Evaluación**: Ingresa las observaciones sobre el niño en 4 dimensiones.
-    2. **Perfil educativo**: Un modelo de clustering (KMeans) identifica el perfil.
-    3. **Señal de desajuste**: Un modelo de clasificación (Regresión Logística) detecta incoherencias.
-    4. **Ajuste digital**: El entorno digital modula la lectura final.
     """)
 
 
+
+    with st.expander("Ver índices"):
+        st.dataframe(
+            df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
+        )
+
+
+    st.markdown(
+    """
+    ## Índice de observación educativa
+
+    El **índice de observación educativa** integra distintas dimensiones
+    del desarrollo para orientar la mirada pedagógica.
+
+    Un valor más alto indica que puede ser útil **observar con mayor atención**
+    cómo el entorno, la autonomía y el bienestar interactúan en el proceso educativo.
+
+    Este índice **no evalúa ni diagnostica**; acompaña la observación y la adaptación del entorno.
+    """
+)
+
+# =========================================================
+# Ver índice de observación educativa
+
+    with st.expander("Ver índice de observación educativa"):
+        st.dataframe(
+        df[["ISEE", "IAA", "IBE", "indice_observacion_educativa"]].head()
+    )
+
+
 # =============================================================
-# PESTAÑA 2 — EVALUACIÓN
+# PESTAÑA 4 — PERFILES EDUCATIVOS
 # =============================================================
-with tab_eval:
-    st.markdown("")
 
-    with st.form("formulario_evaluacion"):
+with tab_perfiles:
+    st.header("Perfiles educativos")
 
-        # ----- 1. ENTORNO PREPARADO (ISEE) -----
-        st.subheader("Índice de Soporte del Entorno Educativo (ISEE)")
-        st.markdown("""
-        <div class="montessori-box">
-        <p>
-        En la pedagogía Montessori, el <strong>entorno</strong> es considerado
-        un elemento educativo fundamental.
-        </p>
-        <p>Un entorno preparado es aquel que:</p>
-        <ul>
-        <li>ofrece orden, claridad y previsibilidad,</li>
-        <li>permite al niño actuar con independencia real,</li>
-        <li>acompaña sin interferir ni sobreproteger.</li>
-        </ul>
-        <p>
-        Este indicador describe <strong>cómo el ambiente actual puede facilitar
-        o dificultar la autonomía, la concentración y el bienestar</strong>.
-        </p>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        Los perfiles educativos representan **patrones generales observados**
+        en el conjunto de datos.
 
-        isee_options = {
-            0.0: "Entorno poco preparado: desorden, exceso de estímulos o falta de apoyo adecuado.",
-            0.25: "Entorno con muchas dificultades para sostener la concentración y la autonomía.",
-            0.5: "Entorno medianamente preparado, con aspectos positivos y otros a mejorar.",
-            0.75: "Entorno mayormente preparado, con buen acompañamiento y estructura.",
-            1.0: "Entorno cuidadosamente preparado que favorece autonomía, calma y aprendizaje.",
-        }
-        isee = st.selectbox(
-            "¿Cómo describirías el entorno del niño?",
-            options=list(isee_options.keys()),
-            format_func=lambda x: isee_options[x],
-            help="Selecciona la opción que mejor represente el entorno habitual.",
-            key="isee_selectbox",
-        )
+        No describen a un niño en particular, sino **configuraciones del entorno,
+        la autonomía y el bienestar** que ayudan a orientar la observación pedagógica.
+        """
+    )
 
-        st.divider()
+    # ---------------------------------------------------------
+    # Selección de perfil (control principal de interacción)
+    # ---------------------------------------------------------
 
-        # ----- 2. AUTONOMÍA Y AUTODISCIPLINA (IAA) -----
-        st.subheader("Índice de Autonomía y Autodisciplina (IAA)")
-        st.markdown("""
-        <div class="montessori-box">
-        <p>
-        La autonomía, desde Montessori, no significa "hacer todo solo",
-        sino desarrollar la capacidad de iniciar, sostener y regular la propia actividad.
-        </p>
-        <p>Este indicador refleja el grado en que el niño o adolescente:</p>
-        <ul>
-        <li>actúa por iniciativa propia,</li>
-        <li>mantiene el interés en una tarea,</li>
-        <li>depende o no de estímulos externos constantes.</li>
-        </ul>
-        <p>
-        La autodisciplina es entendida aquí como una construcción interna,
-        no como obediencia externa.
-        </p>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("### Exploración pedagógica")
 
-        iaa_options = {
-            0.0: "Alta dependencia del adulto para iniciar y sostener actividades.",
-            0.25: "Autonomía muy incipiente; necesita guía constante.",
-            0.5: "Muestra autonomía en algunos momentos, pero no de forma estable.",
-            0.75: "Buen nivel de iniciativa y autorregulación.",
-            1.0: "Autonomía consolidada y autodisciplina interna.",
-        }
-        iaa = st.selectbox(
-            "¿Cómo describirías el nivel de autonomía del niño?",
-            options=list(iaa_options.keys()),
-            format_func=lambda x: iaa_options[x],
-            help="Considera la capacidad del niño para iniciar y sostener actividades sin depender excesivamente del adulto.",
-        )
+    perfil_seleccionado = st.radio(
+        "Selecciona un perfil educativo",
+        options=PERFILES_DISPONIBLES,
+        horizontal=True
+    )
 
-        st.divider()
+    # Dataset filtrado por perfil
+    df_perfil = df[df["Perfil_Final"] == perfil_seleccionado]
 
-        # ----- 3. BIENESTAR Y EQUILIBRIO (IBE) -----
-        st.subheader("Índice de Bienestar y Equilibrio (IBE)")
-        st.markdown("""
-        <div class="montessori-box">
-        <p>
-        El bienestar es una condición indispensable para el aprendizaje profundo.
-        </p>
-        <p>
-        Desde la pedagogía Montessori, el niño solo puede concentrarse y aprender
-        cuando existe un equilibrio razonable entre su estado físico,
-        emocional y social.
-        </p>
-        <p>
-        Este indicador no mide estados clínicos,
-        sino la disponibilidad del niño para aprender y desarrollarse
-        en el contexto actual.
-        </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # ---------------------------------------------------------
+    # Visualización pedagógica del perfil (RADAR)
+    # ---------------------------------------------------------
 
-        ibe_options = {
-            0.0: "Malestar importante que interfiere con el aprendizaje.",
-            0.25: "Frecuente desequilibrio físico o emocional.",
-            0.5: "Bienestar intermedio, con altibajos.",
-            0.75: "Buen equilibrio general.",
-            1.0: "Estado de bienestar estable que favorece la concentración y el interés.",
-        }
-        ibe = st.selectbox(
-            "¿Cómo describirías el bienestar general del niño?",
-            options=list(ibe_options.keys()),
-            format_func=lambda x: ibe_options[x],
-            help="Considera el equilibrio físico, emocional y social del niño en su entorno actual.",
-        )
 
-        st.divider()
+    perfil_media = {
+        "Entorno (ISEE)": df_perfil["ISEE"].mean(),
+        "Autonomía (IAA)": df_perfil["IAA"].mean(),
+        "Bienestar (IBE)": df_perfil["IBE"].mean()
+    }
 
-        # ----- 4. ENTORNO DIGITAL (IED) -----
-        st.subheader("Índice de Entorno Digital (IED)")
-        st.markdown("""
-        <div class="montessori-box">
-        <p>
-        Las pantallas forman parte del mundo actual, pero su uso debe estar equilibrado.
-        </p>
-        <p>
-        Este indicador permite considerar cómo distintos entornos digitales
-        pueden influir en el desarrollo.
-        </p>
-        </div>
-        """, unsafe_allow_html=True)
+    fig = go.Figure()
 
-        ied_options = {
-            0.0: "Uso digital muy desequilibrado, con impacto negativo.",
-            0.25: "Uso frecuente con poco acompañamiento.",
-            0.5: "Uso moderado, con equilibrio variable.",
-            0.75: "Uso mayormente equilibrado y acompañado.",
-            1.0: "Uso digital consciente, educativo y bien integrado.",
-        }
-        ied = st.selectbox(
-            "¿Cómo describirías el entorno digital?",
-            options=list(ied_options.keys()),
-            format_func=lambda x: ied_options[x],
-            help="Considera la frecuencia, el tipo de uso y el acompañamiento adulto.",
-        )
-
-        st.divider()
-        enviado = st.form_submit_button("Observar lectura pedagógica")
-
-    # --- RESULTADOS ---
-    if enviado:
-        input_df = pd.DataFrame(
-            [[isee, iaa, ibe]], columns=["ISEE", "IAA", "IBE"]
-        )
-        condicion_base_ok = not (
-            (isee <= THRESHOLD_CONDICION_BASE)
-            and (iaa <= THRESHOLD_CONDICION_BASE)
-            and (ibe <= THRESHOLD_CONDICION_BASE)
-        )
-
-        input_cluster_scaled = scaler_cluster.transform(input_df)
-        perfil_predicho = kmeans.predict(input_cluster_scaled)[0]
-
-        riesgo_base = model.predict_proba(input_df)[0][1]
-        riesgo_ajustado = ajustar_riesgo_por_ied(riesgo_base, ied)
-
-        st.divider()
-        st.subheader("Lectura pedagógica del desarrollo")
-
-        if not condicion_base_ok:
-            st.warning("""
-            **Condiciones básicas del desarrollo comprometidas**
-
-            Los niveles actuales de entorno, autonomía y bienestar
-            se encuentran por debajo de lo necesario para sostener
-            un proceso de desarrollo pleno.
-
-            Desde la pedagogía Montessori, la prioridad es
-            restablecer condiciones básicas del ambiente
-            antes de interpretar perfiles educativos o señales de desajuste.
-            """)
-        else:
-            st.markdown(MENSAJES_PERFIL[perfil_predicho])
-
-            if riesgo_ajustado >= THRESHOLD_PEDAGOGICO:
-                st.warning(MENSAJES_DESAJUSTE[perfil_predicho])
-            else:
-                st.success("""
-                **Sin señales significativas de desajuste**
-
-                El modelo no detecta incoherencias relevantes entre
-                el entorno, la autonomía y el bienestar en este momento.
-
-                Recomendación: continuar observando y acompañando
-                el proceso de desarrollo con la misma coherencia.
-                """)
-
-        # --- Radar del perfil ---
-        st.divider()
-        st.subheader("Perfil del niño evaluado")
-        radar_fig = go.Figure()
-        radar_fig.add_trace(go.Scatterpolar(
-            r=[isee, iaa, ibe, isee],
-            theta=["ISEE<br>Entorno", "IAA<br>Autonomía", "IBE<br>Bienestar", "ISEE<br>Entorno"],
+    fig.add_trace(
+        go.Scatterpolar(
+            r=list(perfil_media.values()),
+            theta=list(perfil_media.keys()),
             fill="toself",
-            fillcolor="rgba(71, 99, 162, 0.25)",
-            line=dict(color=COLOR_NAVY, width=2),
-            name="Niño evaluado",
-        ))
-        radar_fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 1], tickvals=[0, 0.25, 0.5, 0.75, 1]),
-            ),
-            showlegend=False,
-            height=380,
-            margin=dict(t=40, b=40, l=60, r=60),
+            name=perfil_seleccionado,
+            line_color=COLOR_GOLD
         )
-        st.plotly_chart(radar_fig, use_container_width=True)
-
-        # --- Entorno digital ---
-        st.divider()
-        st.subheader("Influencia del entorno digital")
-
-        if ied <= 0.25:
-            st.warning("""
-            **Entorno digital con impacto significativo**
-
-            El uso actual de pantallas puede estar interfiriendo
-            en la concentración y el equilibrio del niño.
-            Considerar reducir exposición y aumentar acompañamiento.
-            """)
-        elif ied <= 0.5:
-            st.info("""
-            **Entorno digital con margen de mejora**
-
-            El uso de pantallas es moderado pero podría beneficiarse
-            de mayor intencionalidad y acompañamiento adulto.
-            """)
-        else:
-            st.success("""
-            **Entorno digital equilibrado**
-
-            El uso de pantallas parece estar bien integrado,
-            con propósito educativo y acompañamiento adecuado.
-            """)
-
-        # --- Indicadores técnicos ---
-        st.divider()
-        st.caption("Indicador técnico de referencia")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Probabilidad base", f"{riesgo_base:.0%}")
-        with col2:
-            st.metric("Ajustada (entorno digital)", f"{riesgo_ajustado:.0%}")
-
-        st.caption("""
-        La lectura pedagógica se basa en un umbral cuidadosamente definido.
-        El modelo solo señala desajuste cuando la probabilidad supera el 65%,
-        para evitar alertas innecesarias y respetar los ritmos naturales del desarrollo.
-        """)
-
-        # --- Reflexión final ---
-        st.divider()
-        st.markdown("""
-        ### Reflexión final
-
-        En la pedagogía Montessori, el desarrollo no se mide por resultados
-        inmediatos, sino por la **coherencia entre el niño y su entorno**.
-
-        Esta herramienta no ofrece diagnósticos ni etiquetas.
-        Ofrece **información para observar, comprender y acompañar mejor**.
-
-        Cuando surge una señal de desajuste, la pregunta no es:
-        *¿qué le pasa al niño?*,
-        sino:
-        *¿qué necesita el ambiente para acompañarlo mejor?*
-        """)
-
-
-# =============================================================
-# PESTAÑA 3 — EXPLORACIÓN DE DATOS
-# =============================================================
-with tab_datos:
-    st.markdown("")
-
-    sub_rend, = st.tabs([
-        "Rendimiento estudiantil"])
-
-    # --- Subpestaña: Rendimiento estudiantil ---
-    with sub_rend:
-        df_raw = cargar_datos_rendimiento()
-        df_idx = computar_indices(df_raw)
-
-        st.subheader("Distribución de los índices pedagógicos")
-        idx_to_show = st.selectbox(
-            "Selecciona un índice",
-            ["ISEE", "IAA", "IBE"],
-            key="hist_idx_select",
-        )
-        nombres_idx = {
-            "ISEE": "Entorno preparado (ISEE)",
-            "IAA": "Autonomía y autodisciplina (IAA)",
-            "IBE": "Bienestar y equilibrio (IBE)",
-        }
-        fig_hist = px.histogram(
-            df_idx,
-            x=idx_to_show,
-            nbins=40,
-            title=nombres_idx[idx_to_show],
-            labels={idx_to_show: idx_to_show},
-            color_discrete_sequence=[COLOR_NAVY],
-        )
-        fig_hist.update_layout(
-            yaxis_title="Frecuencia",
-            bargap=0.05,
-            height=400,
-        )
-        st.plotly_chart(fig_hist, use_container_width=True)
-
-        st.divider()
-
-        # --- Heatmap de correlación ---
-        st.subheader("Correlación entre índices")
-        corr = df_idx[["ISEE", "IAA", "IBE"]].corr()
-        fig_corr = px.imshow(
-            corr,
-            text_auto=".2f",
-            color_continuous_scale=["#ffffff", COLOR_NAVY],
-            zmin=-1,
-            zmax=1,
-            title="Matriz de correlación (ISEE, IAA, IBE)",
-        )
-        fig_corr.update_layout(height=400)
-        st.plotly_chart(fig_corr, use_container_width=True)
-
-
-# =============================================================
-# PESTAÑA 4 — MODELO Y CLUSTERING
-# =============================================================
-with tab_modelo:
-    st.markdown("")
-
-    df_raw_m = cargar_datos_rendimiento()
-    df_m = computar_indices(df_raw_m)
-    metricas = obtener_metricas_modelo(df_m)
-
-    # --- Métricas principales ---
-    st.subheader("Métricas del modelo")
-    m_col1, m_col2, m_col3 = st.columns(3)
-    with m_col1:
-        st.metric("Accuracy", f"{metricas['accuracy']:.1%}")
-    with m_col2:
-        st.metric("Silhouette Score (k=4)", f"{metricas['silhouette']:.3f}")
-    with m_col3:
-        f1_macro = metricas["report"]["macro avg"]["f1-score"]
-        st.metric("F1 (macro avg)", f"{f1_macro:.2f}")
-
-    st.divider()
-
-    # --- Classification Report ---
-    st.subheader("Classification Report")
-    report = metricas["report"]
-    report_rows = []
-    for label in ["0", "1"]:
-        if label in report:
-            report_rows.append({
-                "Clase": "Sin desajuste" if label == "0" else "Con desajuste",
-                "Precision": f"{report[label]['precision']:.2f}",
-                "Recall": f"{report[label]['recall']:.2f}",
-                "F1-Score": f"{report[label]['f1-score']:.2f}",
-                "Support": int(report[label]["support"]),
-            })
-    report_rows.append({
-        "Clase": "**Macro avg**",
-        "Precision": f"{report['macro avg']['precision']:.2f}",
-        "Recall": f"{report['macro avg']['recall']:.2f}",
-        "F1-Score": f"{report['macro avg']['f1-score']:.2f}",
-        "Support": int(report['macro avg']['support']),
-    })
-    st.dataframe(pd.DataFrame(report_rows), use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # --- Distribución de perfiles (pie chart) ---
-    model_col1, model_col2 = st.columns(2)
-
-    with model_col1:
-        st.subheader("Distribución de perfiles")
-        counts = metricas["cluster_counts"]
-        perfil_names = {
-            0: "Equilibrado",
-            1: "Autonomía en construcción",
-            2: "Entorno exigente",
-            3: "Bienestar comprometido",
-        }
-        fig_pie = px.pie(
-            names=[perfil_names.get(i, f"Cluster {i}") for i in counts.index],
-            values=counts.values,
-            color_discrete_sequence=PLOTLY_COLORS,
-            title="Distribución de perfiles educativos (KMeans k=4)",
-        )
-        fig_pie.update_traces(textinfo="percent+label")
-        fig_pie.update_layout(height=420, showlegend=False)
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    with model_col2:
-        st.subheader("Centroides de los clusters")
-        centroids = metricas["centroids"].copy()
-        centroids.insert(0, "Perfil", [perfil_names.get(i, f"Cluster {i}") for i in centroids.index])
-        for col in ["ISEE", "IAA", "IBE"]:
-            centroids[col] = centroids[col].map("{:.3f}".format)
-        st.dataframe(centroids, use_container_width=True, hide_index=True)
-
-        st.markdown("""
-        <div class="montessori-box" style="margin-top:1em;">
-        <p><strong>Nota:</strong> Los centroides están en escala estandarizada (StandardScaler).
-        Valores negativos indican "por debajo de la media" y positivos "por encima".</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.divider()
-
-    # --- Histograma de probabilidad de desajuste ---
-    st.subheader("Distribución de la probabilidad de desajuste")
-    fig_proba = px.histogram(
-        x=metricas["y_proba"],
-        nbins=40,
-        color_discrete_sequence=[COLOR_NAVY],
-        labels={"x": "Probabilidad predicha de desajuste"},
-        title="Distribución de probabilidades en el conjunto de test",
     )
-    fig_proba.add_vline(
-        x=THRESHOLD_PEDAGOGICO,
-        line_dash="dash",
-        line_color=COLOR_GOLD,
-        annotation_text=f"Umbral = {THRESHOLD_PEDAGOGICO}",
-        annotation_position="top right",
-    )
-    fig_proba.update_layout(
-        yaxis_title="Frecuencia",
-        height=400,
-        bargap=0.05,
-    )
-    st.plotly_chart(fig_proba, use_container_width=True)
 
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1]
+            )
+        ),
+        showlegend=False,
+        title="Configuración pedagógica del perfil",
+        paper_bgcolor=COLOR_LIGHT,
+        font_color=COLOR_NAVY
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.caption(
+        "La visualización representa valores medios del perfil educativo seleccionado. "
+        "No describe casos individuales ni emite juicios diagnósticos."
+    )
+
+    st.markdown("---")
+
+    # ---------------------------------------------------------
+    # Orientación pedagógica asociada al perfil
+    # ---------------------------------------------------------
+    st.subheader("Orientación pedagógica asociada al perfil")
+
+    st.markdown(MENSAJES_PERFIL.get(perfil_seleccionado, ""))
+
+    st.info(
+    "La orientación describe **condiciones del entorno educativo** y posibles "
+    "focos de observación. No constituye evaluación, diagnóstico ni clasificación individual."
+    )
 
 # =============================================================
 # PESTAÑA 5 — METODOLOGÍA
 # =============================================================
+
 with tab_metodo:
-    st.markdown("")
+    st.header("Metodología")
 
-    st.subheader("Construcción de los índices")
+    st.markdown(
+        """
+        ### Enfoque pedagógico
 
-    st.markdown("""
-    <div class="montessori-box">
-    <h4 style="color:#4763a2;">ISEE — Índice Socioeducativo del Entorno</h4>
-    <p><code>ISEE = MinMaxScaler(0.40 × Parental_Involvement + 0.35 × Access_to_Resources + 0.25 × Teacher_Quality)</code></p>
-    <p>Variables originales mapeadas: Low=1, Medium=2, High=3. Resultado normalizado a [0, 1].</p>
-    </div>
-    """, unsafe_allow_html=True)
+        Esta herramienta se fundamenta en los principios de la **pedagogía Montessori**
+        tal como son definidos por la *Asociación Montessori Internacional (AMI)*,
+        donde la observación científica del niño precede a cualquier intervención.
 
-    st.markdown("""
-    <div class="montessori-box">
-    <h4 style="color:#4763a2;">IAA — Índice de Autonomía y Autodisciplina</h4>
-    <p><code>IAA = MinMaxScaler(0.30 × Hours_Studied + 0.30 × Attendance + 0.25 × Motivation_Level − 0.15 × Tutoring_Sessions)</code></p>
-    <p>Variables previamente normalizadas con MinMaxScaler. Tutoring_Sessions resta porque indica dependencia del adulto.</p>
-    </div>
-    """, unsafe_allow_html=True)
+        En este marco, el objetivo no es predecir conductas ni clasificar,
+        sino **comprender patrones de relación entre el entorno, la autonomía y el bienestar**
+        para favorecer una adaptación consciente del ambiente educativo.
+        """
+    )
 
-    st.markdown("""
-    <div class="montessori-box">
-    <h4 style="color:#4763a2;">IBE — Índice de Bienestar y Equilibrio</h4>
-    <p><code>IBE = MinMaxScaler(0.30 × Sleep_Hours_norm + 0.25 × Physical_Activity_norm + 0.20 × Peer_Influence_norm + 0.15 × Motivation_Level + 0.10 × Attendance)</code></p>
-    <p>Sleep_Hours y Physical_Activity normalizados a [0, 1] antes de combinar. Peer_Influence: Positive=1, Neutral=0, Negative=−1, normalizado a [0, 1].</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        ### Enfoque metodológico y técnico
 
-    st.markdown("""
-    <div class="montessori-box">
-    <h4 style="color:#4763a2;">IED — Índice de Entorno Digital</h4>
-    <p>Calculado a partir del dataset <code>screen_time.csv</code> como proporción de tiempo educativo sobre tiempo total, agrupado por edad.</p>
-    <p>En la app se utiliza como factor de ajuste: <code>riesgo_ajustado = riesgo_base × (1 + 0.3 × (0.5 − IED))</code></p>
-    <p>Rango de ajuste: ±15% sobre la probabilidad base.</p>
-    </div>
-    """, unsafe_allow_html=True)
+        - Construcción de **índices pedagógicos** a partir de variables observables
+        - Uso de **clustering no supervisado (K-Means)** para identificar patrones generales
+        - Ausencia deliberada de modelos predictivos supervisados
+        - Prioridad en la **interpretabilidad** sobre la precisión predictiva
+        """
+    )
 
-    st.divider()
+    st.markdown(
+        """
+        ### Decisiones clave del diseño
 
-    # --- Pipeline ---
+        **Por qué no se utiliza un modelo predictivo supervisado**
+
+        En coherencia con Montessori, no se dispone de un *ground truth* clínico
+        ni se busca predecir resultados individuales.
+        Utilizar modelos supervisados en este contexto podría inducir
+        a interpretaciones deterministas o diagnósticas,
+        contrarias al enfoque pedagógico de respeto al desarrollo.
+
+        **Por qué se utilizan índices pedagógicos**
+
+        Los índices permiten sintetizar observaciones complejas
+        sin reducir al niño a una etiqueta,
+        favoreciendo una lectura integrada y reflexiva del proceso educativo.
+        """
+    )
+
+    st.info(
+        """
+        **Nota ética y pedagógica**
+
+        Esta aplicación no emite diagnósticos, evaluaciones ni recomendaciones prescriptivas.
+        Su función es **acompañar la observación pedagógica**
+        y apoyar la reflexión del adulto responsable del entorno educativo.
+        """
+    )
+
+# --- Pipeline ---
     st.subheader("Pipeline de datos")
     st.markdown("""
     1. **Carga y limpieza**: `StudentPerformanceFactors.csv` (6,607 registros). Nulos en `Teacher_Quality` (78) y `Parental_Education_Level` (90) imputados con la moda.
     2. **Mapeo de variables categóricas**: Low/Medium/High a 1/2/3, Yes/No a 1/0, Peer_Influence a 1/0/−1.
     3. **Normalización**: MinMaxScaler aplicado a componentes individuales antes de combinar en índices.
-    4. **Construcción de índices**: ISEE, IAA, IBE calculados como combinaciones lineales ponderadas.
-    5. **Variable objetivo**: `Desajuste` construido con reglas sobre ISEE, IAA, IBE (Score_Desajuste ≥ 1 → 1).
+    4. **Construcción de índices**: ISEE, IAA, IBE, indice de observación educativa, calculados como combinaciones lineales ponderadas.
     6. **KMeans (k=4)**: Clustering sobre [ISEE, IAA, IBE] estandarizados con StandardScaler.
-    7. **Regresión Logística**: Pipeline StandardScaler + LogisticRegression (class_weight="balanced", max_iter=1000), split 80/20 estratificado.
-    8. **IED**: Proporción de screen time educativo desde `screen_time.csv`, agrupado por Child/Adolescent.
     """)
-
     st.divider()
 
-    # --- Limitaciones ---
-    st.subheader("Limitaciones conocidas")
-    st.markdown("""
-    **1. Variable objetivo circular.**
-    `Desajuste` se construye con reglas manuales sobre ISEE, IAA, IBE — las mismas variables usadas como features.
-    El modelo aproxima las reglas, no aprende de datos reales externos. Esto explica el accuracy de ~63%.
 
-    **2. Data leakage en scalers.**
-    Los MinMaxScaler se ajustan sobre el dataset completo antes del train/test split.
-
-    **3. IED constante.**
-    IED se asigna como promedio (~0.5) a las 6,607 filas porque no hay datos individuales de uso de pantalla.
-
-    **4. Cluster labels hardcodeados.**
-    Las etiquetas pedagógicas están asignadas a IDs de cluster fijos. Si se reentrena KMeans, los IDs pueden cambiar.
-
-    **5. Sin cross-validation.**
-    Solo se usa un split 80/20 sin validación cruzada ni comparación de modelos.
-    """)
-
-    st.divider()
-
-    # --- Citas Montessori ---
+# --- Citas Montessori ---
     st.subheader("Fundamentos pedagógicos")
     st.markdown("""
     > *"El niño no es un vaso que se llena, sino una fuente que se deja brotar."*
