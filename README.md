@@ -34,7 +34,7 @@ Desarrollo de una aplicación interactiva en Streamlit, pensada para familias, d
 
 - **`app.py`**: Archivo principal para la ejecución del proyecto.
 - **`powerbi_dataset.csv` y `powerbi_dataset.xlsx`**: Conjuntos de datos utilizados para análisis y visualización.
-- ** y `Factors1.ipynb`**: Notebooks de Jupyter para análisis exploratorio de datos (EDA).
+- **`Factors1.ipynb`**: Notebooks de Jupyter para análisis exploratorio de datos (EDA).
 - **`StudentPerformanceFactors.csv`**: Datos sobre factores que afectan el rendimiento estudiantil.
 
 ## Instalación
