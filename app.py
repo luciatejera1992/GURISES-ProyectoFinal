@@ -53,7 +53,7 @@ THRESHOLD_CONDICION_BASE = 0.25
 # RUTAS
 # =========================================================
 BASE_DIR = Path(__file__).parent
-DATA_FILE = BASE_DIR / "data" / "studentperformancefactors.csv"
+DATA_FILE = BASE_DIR / "data" / "StudentPerformanceFactors.csv"
 
 # ============================================
 # CABECERA Y LOGO
