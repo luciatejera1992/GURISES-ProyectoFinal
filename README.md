@@ -115,6 +115,14 @@ Puedes acceder al dashboard interactivo de Power BI haciendo clic en el siguient
 
 https://app.powerbi.com/groups/me/reports/d113795a-6f16-4f96-9f8c-31c344a3c925/3b85740245d2d995ceba?experience=power-bi
 
+
+
+
+## Probar la app GURISES 
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://gurises.streamlit.app/)
+
+
 ## Contacto
 
 Para preguntas o sugerencias:
