@@ -124,12 +124,12 @@ st.markdown(
 # ============================================
 
 DATA_DIR = BASE_DIR / "data"
-DATA_FILE = DATA_DIR / "studentperformancefactors.csv"
+DATA_FILE = DATA_DIR / "StudentPerformanceFactors.csv"
 
 if not DATA_FILE.exists():
     st.error(
         "No se encuentra el archivo de datos base "
-        "`studentperformancefactors.csv` en la carpeta /data."
+        "`StudentPerformanceFactors.csv` en la carpeta /data."
     )
     st.stop()
 
