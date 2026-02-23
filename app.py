@@ -575,7 +575,7 @@ with col1:
     """)
     with col2:
         st.image(
-        "assets/1-María-Montessori.jpg",
+        "assets/Maria-Montessori.jpg",
         caption="María Montessori (Italia 1870-1952)"
     )
 
